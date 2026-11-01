@@ -36,8 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 page_head('Login');
 ?>
-<h1>ARES 118</h1>
-<p class="sub">Accesso Dashboard Operativa</p>
+<h1>Accedi al turno</h1>
+<p class="sub">Dashboard operativa ARES 118: schede di soccorso, mezzi e Centrale Operativa.</p>
 <?php if ($error): ?><div class="flash err"><?= e($error) ?></div><?php endif; ?>
 <form method="post" class="login" autocomplete="on" data-once>
   <?= csrf_field() ?>

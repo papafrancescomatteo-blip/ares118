@@ -24,10 +24,17 @@ function page_head(string $title, string $width = 'narrow'): void
 <title><?= e($title) ?> - <?= e(SITE_NAME) ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=2">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css?v=4">
 </head>
 <body>
+<header class="topbar"><div class="topbar-in">
+  <img src="<?= e(logo_url()) ?>" alt="">
+  <div class="wm"><b>ARES 118 Lazio</b><span>Unità di Emergenza · Dashboard operativa</span></div>
+<?php if ($cu = current_user()): ?>
+  <div class="who"><b><?= e(full_name($cu)) ?></b><a href="dashboard.php">Home</a></div>
+<?php endif; ?>
+</div></header>
 <main class="shell <?= e($width) ?>">
 <div class="panel">
 <?php if ($flash): ?>
@@ -40,7 +47,7 @@ function page_foot(array $scripts = ['assets/js/app.js?v=2']): void
     ?>
 </div>
 </main>
-<div class="redbar"></div>
+<div class="redbar" aria-hidden="true"></div>
 <?php foreach ($scripts as $s): ?>
 <script src="<?= e($s) ?>"></script>
 <?php endforeach; ?>
