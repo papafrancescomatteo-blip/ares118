@@ -1,0 +1,8 @@
+.git
+.gitignore
+README.md
+render.yaml
+bot/esempio_bot.py
+vendor
+tests
+*.zip

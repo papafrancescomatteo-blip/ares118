@@ -1,0 +1,29 @@
+Options -Indexes
+DirectoryIndex index.php
+
+# Fa arrivare l'header Authorization a PHP (serve al bot)
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+# Cartelle interne: mai raggiungibili dal browser
+<IfModule mod_alias.c>
+RedirectMatch 404 ^/(vendor|tests|tools|includes|bot)(/|$)
+</IfModule>
+
+# File che non devono mai essere scaricabili dal browser
+<FilesMatch "^(config\.php|composer\.(json|lock)|Dockerfile|docker-entrypoint\.sh|render\.yaml|README\.md|\.htaccess)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+
+# Impostazioni PHP di sicurezza (ignorate se l'hosting non le permette)
+<IfModule mod_php.c>
+  php_flag display_errors off
+</IfModule>

@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: ares118
+    runtime: docker
+    plan: free
+    healthCheckPath: /index.php
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DB
+        value: ares118
+      - key: TRUST_PROXY
+        value: "1"
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: BOT_TOKEN
+        generateValue: true

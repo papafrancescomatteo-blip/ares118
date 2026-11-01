@@ -1,0 +1,11 @@
+{
+  "name": "ares118/dashboard",
+  "description": "Dashboard operativa ARES 118",
+  "type": "project",
+  "require": {
+    "php": ">=8.1",
+    "ext-mongodb": "*",
+    "mongodb/mongodb": "*"
+  },
+  "config": { "optimize-autoloader": true, "sort-packages": true }
+}
