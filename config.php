@@ -31,33 +31,31 @@ define('BOT_TOKEN', env_or('BOT_TOKEN', 'CAMBIA_CON_UNA_CHIAVE_LUNGA_E_CASUALE')
 // PROPOSTA da confermare: i ruoli dirigenziali/di coordinamento gestiscono il personale, gli altri no.
 const ROLE_MAP = [
     // Dirigenza ARES 118
-    'ID_DIRIGENTE_ARES_118'            => 'direttore',
-    'ID_VICE_DIRIGENTE_ARES_118'       => 'vice_direttore',
+    '1494395260317597786' => 'direttore',        // Dirigente ARES 118
+    '1494395387828633620' => 'vice_direttore',   // Vice Dirigente ARES 118
     // Coordinamento ARES 118
-    'ID_REFERENTE_MEDICI'              => 'coordinatore',
-    'ID_REFERENTE_INFERMIERI'          => 'coordinatore',
-    'ID_REFERENTE_OPERATORI'           => 'coordinatore',
-    'ID_REFERENTE_EMERGENZE'           => 'coordinatore',
-    'ID_REFERENTE_FORMAZIONE'          => 'coordinatore',
-    'ID_REFERENTE_MATERIALI'           => 'coordinatore',
+    '1565785287693566033' => 'coordinatore',     // Referente Medici
+    '1565785398913933433' => 'coordinatore',     // Referente Infermieri
+    '1494395589616468058' => 'coordinatore',     // Referente Operatori
+    '1494395703563386989' => 'coordinatore',     // Referente Emergenze
+    '1494382277118005249' => 'coordinatore',     // Referente Formazione
+    '1494382276082143394' => 'coordinatore',     // Referente Materiali
     // Gradi alti
-    'ID_ISPETTORE_OPERATIVO'           => 'coordinatore',
-    'ID_CAPO_TURNO'                    => 'coordinatore',
-    // Reparto USAR
-    'ID_DIRETTORE_GENERALE_USAR'       => 'coordinatore',
-    'ID_DIRETTORE_SANITARIO'           => 'coordinatore',
-    'ID_DIRETTORE_UOC_GRANDI_EVENTI'   => 'coordinatore',
-    'ID_COORDINATORE_INFERMIERISTICO'  => 'coordinatore',
-    'ID_OPERATORE_USAR_EXPERT'         => 'soccorritore',
-    'ID_OPERATORE_USAR_EFFECTIVE'      => 'soccorritore',
-    'ID_OPERATORE_IN_AFFIANCAMENTO'    => 'recluta',
-    'ID_DISCENTE'                      => 'recluta',
-    'ID_CANDIDATO'                     => 'recluta',
+    '1494382292750303343' => 'coordinatore',     // Ispettore Operativo
+    '1494382295384195153' => 'coordinatore',     // Capo Turno
     // Sanitari
-    'ID_MEDICO_EMERGENZA_URGENZA_118'      => 'medico',
-    'ID_INFERMIERE_EMERGENZA_URGENZA_118'  => 'infermiere',
-    // Centrale Operativa (ruolo Discord dei centralinisti: da indicare)
-    'ID_CENTRALINISTA'                 => 'co',
+    '1494382299452543176' => 'medico',           // Medico
+    '1494382301952344228' => 'infermiere',       // Infermiere
+    // Operatori
+    '1494382304485703771' => 'soccorritore',     // Capo Equipaggio
+    '1494382309733044386' => 'soccorritore',     // Soccorritore Avanzato
+    '1494382312924778516' => 'soccorritore',     // Soccorritore Esperto / Operatore DAE
+    '1494382314980118620' => 'soccorritore',     // Soccorritore 118
+    // In formazione
+    '1494382317978914836' => 'recluta',          // Soccorritore in Prova
+    '1494382318935081182' => 'recluta',          // Allievo Soccorritore
+    // Ancora da indicare (reparto USAR e Centrale Operativa): togli il commento e metti l'ID quando lo hai
+    // 'ID_CENTRALINISTA'  => 'co',              // ruolo Discord dei centralinisti
 ];
 
 // ---------- Ruoli e permessi ----------

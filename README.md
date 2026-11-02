@@ -76,7 +76,7 @@ Risposta: `created` (nuovi account con username e password temporanea, da inviar
 `passwords` (reset richiesti), `updated`, `deactivated`.
 L'**username di accesso è "Nome Cognome"**. Le password sono salvate solo come hash: il bot è l'unico momento
 in cui la password in chiaro è visibile, e al primo login viene chiesto di cambiarla.
-`bot/esempio_bot.py` è un esempio completo (discord.py) con sincronizzazione ogni 30 minuti e comando `!resetpw`.
+`bot/ares_bot.py` è un esempio completo (discord.py) con sincronizzazione ogni 30 minuti e comando `!resetpw`.
 
 Le modifiche fatte a mano dalla pagina Personale (ruolo, disattivazione) mettono la persona in stato **Manuale**:
 il bot non le sovrascrive finché non premi "Affida al bot".

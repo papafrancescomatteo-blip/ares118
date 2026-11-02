@@ -137,6 +137,7 @@ const GRADI = [
     'Referente Medici', 'Referente Infermieri', 'Referente Operatori', 'Referente Emergenze', 'Referente Formazione', 'Referente Materiali',
     'Direttore Generale USAR', 'Direttore Sanitario', 'Direttore U.O.C. Grandi eventi', 'Coordinatore Infermieristico',
     'Medico Emergenza Urgenza 118', 'Infermiere Emergenza Urgenza 118',
+    'Soccorritore Avanzato', 'Soccorritore Esperto / Operatore', 'Soccorritore 118', 'Soccorritore in Prova', 'Allievo Soccorritore',
     'Operatore USAR Expert', 'Operatore USAR Effective', 'Operatore in Affiancamento', 'Discente', 'Candidato',
     'Operatore della Settimana',
 ];
