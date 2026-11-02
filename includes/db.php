@@ -129,4 +129,5 @@ function ensure_indexes(): void
     col('assegnazioni')->createIndex(['mezzo_id' => 1, 'stato' => 1]);
     col('assegnazioni')->createIndex(['chiamata_id' => 1]);
     col('assegnazioni')->createIndex(['crew_ids' => 1, 'stato' => 1]);
+    col('jobs')->createIndex(['tipo' => 1, 'stato' => 1, 'creato_at' => 1]);
 }

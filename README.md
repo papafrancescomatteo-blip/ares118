@@ -76,19 +76,27 @@ Risposta: `created` (nuovi account con username e password temporanea, da inviar
 `passwords` (reset richiesti), `updated`, `deactivated`.
 L'**username di accesso è "Nome Cognome"**. Le password sono salvate solo come hash: il bot è l'unico momento
 in cui la password in chiaro è visibile, e al primo login viene chiesto di cambiarla.
-`bot/ares_bot.py` è un esempio completo (discord.py) con sincronizzazione ogni 30 minuti e comando `!resetpw`.
+I moduli pronti per il tuo bot sono in `bot/` (vedi sezione 3c): sincronizzazione ogni 30 minuti, invio credenziali dal pulsante del sito e comando `!resetpw`.
 
 Le modifiche fatte a mano dalla pagina Personale (ruolo, disattivazione) mettono la persona in stato **Manuale**:
 il bot non le sovrascrive finché non premi "Affida al bot".
 
-## 3b. Centrale Operativa (centralino) e mezzi
+## 3b. Centrale Operativa, tablet di bordo e mezzi
 
 - **Gestione mezzi** (`mezzi.php`, solo ruoli con gestione personale): aggiungi/rinomina/disattiva i mezzi. Al primo avvio vengono creati Bravo 01-03, India 01-02, Sierra 01, Mike 01-02, Alfa 01, Victor 01-02.
-- **Gestione personale** (`personale.php` → *Modifica*): gli amministrativi impostano nome, cognome, matricola, grado, ruolo e l'abilitazione CO. Il bot NON sovrascrive questi dati: aggiorna solo ruolo, stato e flag CO.
-- **Inizio turno**: la persona sceglie mezzo e ruolo (Autista, Capo Squadra, Soccorritore, Infermiere, Medico) oppure "Centrale Operativa". Il sistema impedisce ruoli doppi sullo stesso mezzo e ruoli non consentiti dal proprio ruolo.
-- **Centralino** (`centralino.php`, `chiamata_nuova.php`): il CO registra la chiamata (CH-ANNO-NNNNN), la assegna ai mezzi *liberi* o la lascia in attesa, può richiamare un mezzo o annullare la chiamata. La bacheca si aggiorna da sola.
-- **Equipaggio**: vede l'intervento in dashboard e avanza gli stati (Partiti → Sul posto → Trasporto → Arrivo PS → Libero). La scheda di soccorso si apre già precompilata (equipaggio, mezzo, codice, orari, tipo chiamata).
-- Nel bot il ruolo Discord con valore `'co'` in `ROLE_MAP` abilita il centralino (`ID_CENTRALINISTA`).
+- **Gestione personale** (`personale.php` → *Modifica*): gli amministrativi impostano nome, cognome, matricola, grado, ruolo e abilitazione CO. Il bot NON sovrascrive questi dati.
+- **Inizio turno**: la persona sceglie mezzo e ruolo (Autista, Capo Equipaggio, Soccorritore, Infermiere, Medico) oppure "Centrale Operativa". Il sistema impedisce ruoli doppi sullo stesso mezzo.
+- **Tablet di bordo**: dopo l'avvio su un mezzo la home diventa il tablet: equipaggio, interventi, schede da compilare, orologio. Quando il centralino assegna una chiamata il tablet **suona** (due toni ripetuti, barra rossa lampeggiante, vibrazione) finché non si silenzia o si avanza lo stato. I browser vogliono un tocco per attivare l'audio: se serve compare "Attiva audio".
+- **Chi gestisce l'intervento**: se a bordo c'è una sola persona, fa tutto lei. Se sono più persone, solo il **Capo Equipaggio** avanza gli stati e compila la scheda (se manca: Medico, poi Infermiere, Autista, Soccorritore). Gli altri vedono tutto e sentono il suono, senza pulsanti.
+- **Centralino** (`centralino.php`, `chiamata_nuova.php`): il CO registra la chiamata (CH-ANNO-NNNNN), la assegna ai mezzi *liberi* o la lascia in attesa, può richiamare un mezzo o annullare la chiamata.
+- **Scheda di soccorso**: 7 schermate con barra di avanzamento (Missione, Paziente, Valutazione, Prestazioni, Eventi critici e rifiuti, Esito e note, Equipaggio e firme), precompilata dall'intervento.
+
+## 3c. Account, credenziali e ruoli dal bot
+
+- Il bot **crea e aggiorna gli account** ogni 30 minuti leggendo i ruoli Discord, ma **non scrive a nessuno**.
+- In *Gestione personale* il pulsante **"Invia credenziali"** chiede al bot di mandare in DM a ciascuno username e **password temporanea** (da cambiare al primo accesso). Il bot lo esegue entro un minuto e il sito mostra quanti sono stati inviati e chi ha i DM chiusi (per loro: "Reset pw"). Ci sono anche "Reinvia a tutti" e "Invia DM" sulla singola persona.
+- **Conferma ruoli**: Direttore, Vice Direttore e Coordinatori arrivano da Discord solo come *richiesta*. Finché l'amministratore del sito (ruolo Direttore) non preme **Conferma** in *Gestione personale*, la persona resta con il ruolo attuale (i nuovi account partono come Recluta). "Rifiuta" ricorda la scelta: il bot non richiede lo stesso ruolo.
+- Per il bot: aggiungi `bot/ares_sync.js` (Node, discord.js v14) o `bot/ares_sync.py` (discord.py) al tuo bot e imposta `ARES_SITE_URL`, `ARES_BOT_TOKEN` (= `BOT_TOKEN` di Render), `ARES_GUILD_ID` (vedi `bot/.env.esempio`).
 
 ## 4. Personalizzare
 

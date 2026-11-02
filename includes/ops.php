@@ -19,6 +19,30 @@ function allowed_crew_roles(array $u): array
     return (array)(role_info($u['ruolo'])['equip'] ?? []);
 }
 
+/** Chi gestisce interventi e scheda a bordo: il Capo Equipaggio; se manca, il primo per questa priorita'; se e' solo, lui. */
+const PRIORITA_CAPO = ['Capo Equipaggio', 'Medico', 'Infermiere', 'Autista', 'Soccorritore'];
+
+/** Membro dell'equipaggio che fa da capo (voce di 'crew' di board_data) oppure null */
+function crew_lead(array $crew): ?array
+{
+    foreach ([false, true] as $anche_in_pausa) {
+        foreach (PRIORITA_CAPO as $ruolo) {
+            foreach ($crew as $c) {
+                if ($c['ruolo'] === $ruolo && ($anche_in_pausa || empty($c['shift']['pause_started']))) {
+                    return $c;
+                }
+            }
+        }
+    }
+    return null;
+}
+
+function is_crew_lead(array $user, ?array $mezzo): bool
+{
+    $lead = $mezzo ? crew_lead($mezzo['crew']) : null;
+    return $lead !== null && (string)$lead['user']['id'] === (string)$user['id'];
+}
+
 function hm($ts): string
 {
     return $ts ? date('H:i', (int)$ts) : '—';
@@ -277,28 +301,45 @@ function refresh_call(string $id): void
 
 function can_access_assegnazione(array $user, array $a): bool
 {
-    if (can('centralino', $user) || in_array($user['id'], (array)($a['crew_ids'] ?? []), true)) {
+    if (can('centralino', $user)) {
         return true;
     }
-    $s = open_shift($user['id']);
-    return $s && !empty($s['mezzo_id']) && $s['mezzo_id'] === ($a['mezzo_id'] ?? null);
+    $m = find_mezzo_in(board_data(), (string)($a['mezzo_id'] ?? ''));
+    if ($m && $m['crew']) {
+        return is_crew_lead($user, $m);          // con equipaggio a bordo la scheda la compila il capo
+    }
+    return in_array($user['id'], (array)($a['crew_ids'] ?? []), true);   // mezzo senza equipaggio: chi c'era
 }
 
-/** Interventi dell'equipaggio: 'attive' (sul mio mezzo adesso) e 'da_compilare' (concluse senza scheda, ultime 12 ore) */
-function my_assignments(array $user, ?array $shift): array
+/**
+ * Interventi dell'equipaggio: 'attive' (sul mio mezzo adesso), 'da_compilare' (concluse senza scheda, ultime 12 ore,
+ * solo per chi deve compilarle) e 'capo' (true se sono io il capo equipaggio).
+ */
+function my_assignments(array $user, ?array $shift, ?array $myMezzo = null): array
 {
     $attive = [];
     $mid = $shift['mezzo_id'] ?? null;
+    $capo = false;
     if ($mid) {
         $attive = find_all('assegnazioni', ['mezzo_id' => $mid, 'stato' => ['$in' => ATTIVE]], ['sort' => ['assegnata_at' => 1]]);
+        $capo = is_crew_lead($user, $myMezzo ?? find_mezzo_in(board_data(), $mid));
     }
-    $or = [['crew_ids' => $user['id']]];
+    $base = ['stato' => 'libera', 'scheda_id' => null, 'libera_at' => ['$gt' => time() - 43200]];
+    $da = [];
     if ($mid) {
-        $or[] = ['mezzo_id' => $mid];
+        if ($capo) {
+            $da = find_all('assegnazioni', $base + ['mezzo_id' => $mid], ['sort' => ['libera_at' => -1]]);
+        }
+    } else {
+        // non sono su un mezzo: le schede dei mezzi rimasti senza equipaggio in cui c'ero
+        $board = board_data();
+        foreach (find_all('assegnazioni', $base + ['crew_ids' => $user['id']], ['sort' => ['libera_at' => -1]]) as $x) {
+            $m = find_mezzo_in($board, (string)$x['mezzo_id']);
+            if (!$m || !$m['crew']) {
+                $da[] = $x;
+            }
+        }
     }
-    $da = find_all('assegnazioni', [
-        'stato' => 'libera', 'scheda_id' => null, 'libera_at' => ['$gt' => time() - 43200], '$or' => $or,
-    ], ['sort' => ['libera_at' => -1]]);
     foreach ($attive as &$a) {
         $a['call'] = find_one_by('chiamate', id_filter($a['chiamata_id'])) ?? [];
     }
@@ -307,7 +348,7 @@ function my_assignments(array $user, ?array $shift): array
         $a['call'] = find_one_by('chiamate', id_filter($a['chiamata_id'])) ?? [];
     }
     unset($a);
-    return ['attive' => $attive, 'da_compilare' => $da];
+    return ['attive' => $attive, 'da_compilare' => $da, 'capo' => $capo];
 }
 
 /** Valori iniziali della scheda di soccorso: dati della chiamata, orari dell'intervento ed equipaggio */

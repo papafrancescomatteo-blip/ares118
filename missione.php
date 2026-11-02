@@ -18,9 +18,13 @@ if ($action === 'avanza') {
     $a = $id !== '' ? find_one_by('assegnazioni', id_filter($id)) : null;
     $shift = open_shift($user['id']);
     $mine = $a && $shift && !empty($shift['mezzo_id']) && $shift['mezzo_id'] === $a['mezzo_id'];
+    $mz = $mine ? find_mezzo_in(board_data(), $a['mezzo_id']) : null;
+    $lead = $mz ? crew_lead($mz['crew']) : null;
     $to = post_str('to');
     if (!$a || (!$mine && !$isCo)) {
         flash('Non puoi aggiornare questo intervento.', 'err');
+    } elseif (!$isCo && !is_crew_lead($user, $mz)) {
+        flash('Gli interventi li gestisce il capo equipaggio' . ($lead ? ' (<b>' . e($lead['nome']) . '</b>)' : '') . '.', 'err');
     } elseif (!in_array($to, TRANSIZIONI[$a['stato']] ?? [], true)) {
         flash('Lo stato dell\'intervento è già cambiato: la pagina è stata aggiornata.', 'err');
     } else {

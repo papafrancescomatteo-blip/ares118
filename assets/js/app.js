@@ -110,8 +110,9 @@
   });
   // ---- Aggiornamento automatico dei pannelli [data-live] (centralino, interventi in dashboard) ----
   var live = document.querySelectorAll('[data-live]');
+  function afterLive() { if (window.aresScanCalls) window.aresScanCalls(); }
   if (live.length && window.fetch && window.DOMParser) {
-    var every = Math.max(5, parseInt(live[0].getAttribute('data-live'), 10) || 10) * 1000;
+    var every = Math.max(3, parseInt(live[0].getAttribute('data-live'), 10) || 10) * 1000;
     setInterval(function () {
       if (document.hidden) return;
       fetch(location.href, { credentials: 'same-origin' })
@@ -128,8 +129,149 @@
             if (!fresh || (a && el.contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName))) return;
             if (el.innerHTML !== fresh.innerHTML) el.innerHTML = fresh.innerHTML;
           });
+          afterLive();
         })
         .catch(function () {});
     }, every);
+  }
+
+  // ---- Tablet di bordo: orologio e suono delle chiamate ----
+  var clock = document.getElementById('clock');
+  if (clock) {
+    var tick = function () { var d = new Date(); clock.textContent = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) + ':' + ('0' + d.getSeconds()).slice(-2); };
+    tick(); setInterval(tick, 1000);
+  }
+
+  var alertBar = document.getElementById('alert-bar');
+  if (alertBar) {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    var ctx = null, timer = null, blink = null, baseTitle = document.title;
+    var audioBar = document.getElementById('audio-bar');
+    var audioBtn = document.getElementById('audio-btn');
+    var store = function (k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
+    var getAck = function () { try { return JSON.parse(sessionStorage.getItem('ares_ack') || '[]'); } catch (e) { return []; } };
+    var setAck = function (a) { try { sessionStorage.setItem('ares_ack', JSON.stringify(a)); } catch (e) {} };
+    var enabled = function () { return store('ares_audio') !== 'off'; };
+
+    function unlock() {
+      if (!AC) return false;
+      if (!ctx) ctx = new AC();
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx.state === 'running' || ctx.state === 'suspended';
+    }
+    function running() { return ctx && ctx.state === 'running'; }
+    function tone(f, t0, dur) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'square'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t0 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + dur);
+      o.connect(g); g.connect(ctx.destination);
+      o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + 0.02);
+    }
+    // segnale a due toni alternati (stile cercapersone / tablet di bordo), ripetuto tre volte
+    function pattern() {
+      if (!running() || !enabled()) return;
+      for (var i = 0; i < 3; i++) { tone(1320, i * 0.5, 0.22); tone(990, i * 0.5 + 0.25, 0.22); }
+      if (navigator.vibrate) navigator.vibrate([250, 120, 250]);
+    }
+    function refreshAudioUi() {
+      if (audioBtn) audioBtn.textContent = enabled() ? 'Audio attivo' : 'Audio spento';
+      if (audioBar) audioBar.hidden = !(enabled() && AC && !running());
+    }
+    function stopAlarm() {
+      if (timer) { clearInterval(timer); timer = null; }
+      if (blink) { clearInterval(blink); blink = null; document.title = baseTitle; }
+    }
+    function startAlarm() {
+      if (!timer) { pattern(); timer = setInterval(pattern, 3500); }
+      if (!blink) { var on = false; blink = setInterval(function () { on = !on; document.title = on ? 'NUOVA CHIAMATA' : baseTitle; }, 800); }
+    }
+    window.aresScanCalls = function () {
+      var ack = getAck(), pend = [], txt = '';
+      document.querySelectorAll('[data-alert-id]').forEach(function (el) {
+        var id = el.getAttribute('data-alert-id');
+        if (ack.indexOf(id) < 0) { pend.push(id); txt = txt || el.getAttribute('data-alert-text') || ''; }
+      });
+      if (pend.length) {
+        alertBar.hidden = false;
+        document.getElementById('alert-text').textContent = txt ? ' · ' + txt : '';
+        startAlarm();
+      } else {
+        alertBar.hidden = true;
+        stopAlarm();
+      }
+      refreshAudioUi();
+    };
+    document.getElementById('alert-silence').addEventListener('click', function () {
+      var ack = getAck();
+      document.querySelectorAll('[data-alert-id]').forEach(function (el) { var id = el.getAttribute('data-alert-id'); if (ack.indexOf(id) < 0) ack.push(id); });
+      setAck(ack);
+      window.aresScanCalls();
+    });
+    document.getElementById('audio-unlock').addEventListener('click', function () { unlock(); refreshAudioUi(); window.aresScanCalls(); });
+    audioBtn.addEventListener('click', function () {
+      if (enabled()) { store('ares_audio', 'off'); stopAlarm(); }
+      else { store('ares_audio', 'on'); unlock(); pattern(); }
+      refreshAudioUi();
+      window.aresScanCalls();
+    });
+    // il primo tocco in qualunque punto della pagina sblocca l'audio del browser
+    ['click', 'touchstart', 'keydown'].forEach(function (ev) {
+      document.addEventListener(ev, function () { if (enabled() && !running()) { unlock(); setTimeout(function () { refreshAudioUi(); window.aresScanCalls(); }, 50); } }, { passive: true });
+    });
+    window.aresScanCalls();
+  }
+
+  // ---- Scheda di soccorso a schermate (se JavaScript manca, resta tutta in fila) ----
+  var wform = document.querySelector('form[data-wizard]');
+  if (wform) {
+    var secs = [].slice.call(wform.querySelectorAll(':scope > .sec'));
+    var actions = wform.querySelector('.actions');
+    var groups = secs.length === 11 ? [[0, 1], [2, 3], [4], [5], [6, 7], [8, 9], [10]] : secs.map(function (_, i) { return [i]; });
+    var names = secs.length === 11 ? ['Missione', 'Paziente', 'Valutazione', 'Prestazioni', 'Eventi critici e rifiuti', 'Esito e note', 'Equipaggio e firme']
+      : secs.map(function (x) { return x.querySelector('h2').textContent.replace(/^\d+\.\s*/, ''); });
+    var steps = groups.map(function (g, i) { return { name: names[i], secs: g.map(function (k) { return secs[k]; }) }; });
+    var cur = 0;
+
+    wform.classList.add('wiz');
+    var nav = document.createElement('div');
+    nav.className = 'wiz-nav';
+    nav.innerHTML = '<div class="wiz-bar"><i></i></div><div class="wiz-pills"></div><div class="wiz-count"></div>';
+    wform.insertBefore(nav, secs[0]);
+    var pills = nav.querySelector('.wiz-pills'), bar = nav.querySelector('.wiz-bar i'), count = nav.querySelector('.wiz-count');
+    steps.forEach(function (st, i) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = st.name;
+      b.addEventListener('click', function () { show(i); });
+      pills.appendChild(b);
+    });
+
+    var foot = document.createElement('div');
+    foot.className = 'wiz-foot';
+    foot.innerHTML = '<button type="button" class="btn slate" data-w="prev">Indietro</button><button type="button" class="btn teal" data-w="next">Avanti</button>';
+    wform.insertBefore(foot, actions || null);
+    foot.addEventListener('click', function (ev) {
+      var w = ev.target.getAttribute && ev.target.getAttribute('data-w');
+      if (w === 'next') show(cur + 1); else if (w === 'prev') show(cur - 1);
+    });
+
+    function show(i, noScroll) {
+      cur = Math.max(0, Math.min(steps.length - 1, i));
+      steps.forEach(function (st, k) { st.secs.forEach(function (x) { x.style.display = k === cur ? '' : 'none'; }); });
+      [].forEach.call(pills.children, function (b, k) { b.className = (k === cur ? 'on' : '') + (k < cur ? ' done' : ''); });
+      bar.style.width = ((cur + 1) / steps.length * 100) + '%';
+      count.textContent = 'Passo ' + (cur + 1) + ' di ' + steps.length + ' · ' + steps[cur].name;
+      foot.querySelector('[data-w=prev]').style.visibility = cur === 0 ? 'hidden' : 'visible';
+      foot.querySelector('[data-w=next]').style.display = cur === steps.length - 1 ? 'none' : '';
+      if (actions) actions.style.display = cur === steps.length - 1 ? '' : 'none';
+      if (!noScroll) nav.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    // un campo obbligatorio vuoto in una schermata nascosta: ci porta li'
+    wform.addEventListener('invalid', function (ev) {
+      var el = ev.target;
+      steps.forEach(function (st, k) { if (st.secs.some(function (x) { return x.contains(el); })) { if (k !== cur) show(k, true); } });
+    }, true);
+    show(0, true);
   }
 })();

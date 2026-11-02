@@ -19,45 +19,14 @@
 declare(strict_types=1);
 define('NO_SESSION', true);
 require_once __DIR__ . '/../includes/bootstrap.php';
+require_once __DIR__ . '/../includes/bot_auth.php';
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store');
-
-function out(array $d, int $code = 200): void
-{
-    http_response_code($code);
-    echo json_encode($d, JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    out(['ok' => false, 'error' => 'Metodo non consentito'], 405);
-}
-if (BOT_TOKEN === '' || str_starts_with(BOT_TOKEN, 'CAMBIA')) {
-    out(['ok' => false, 'error' => 'BOT_TOKEN non configurato'], 503);
-}
-
-// Token dall'header (alcuni server nascondono Authorization: per questo c'e' anche X-Bot-Token)
-$token = '';
-$h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-if (stripos($h, 'Bearer ') === 0) {
-    $token = trim(substr($h, 7));
-}
-if ($token === '') {
-    $token = trim((string)($_SERVER['HTTP_X_BOT_TOKEN'] ?? ''));
-}
-if (!hash_equals(BOT_TOKEN, $token)) {
-    usleep(300000);
-    out(['ok' => false, 'error' => 'Non autorizzato'], 401);
-}
-
-$raw = defined('BOT_TEST_INPUT') ? BOT_TEST_INPUT : (string)file_get_contents('php://input');
-$body = json_decode($raw, true);
-if (!is_array($body) || !isset($body['users']) || !is_array($body['users'])) {
-    out(['ok' => false, 'error' => 'JSON non valido: manca "users"'], 400);
+$body = bot_require_auth();
+if (!isset($body['users']) || !is_array($body['users'])) {
+    bot_out(['ok' => false, 'error' => 'JSON non valido: manca "users"'], 400);
 }
 if (count($body['users']) > 3000) {
-    out(['ok' => false, 'error' => 'Troppi utenti in una sola richiesta'], 413);
+    bot_out(['ok' => false, 'error' => 'Troppi utenti in una sola richiesta'], 413);
 }
 
 /** Ruolo del sito col livello piu' alto + abilitazione Centrale Operativa (ROLE_MAP valore 'co'). Ritorna [ruolo|null, co] */
@@ -87,6 +56,7 @@ $users = col('users');
 $created = [];
 $passwords = [];
 $updated = 0;
+$pending = 0;
 $deactivated = 0;
 $skipped = [];
 $seen = [];
@@ -118,8 +88,26 @@ try {
                         $deactivated++;
                     }
                 } else {
-                    // nome, cognome, matricola e grado li gestiscono gli amministrativi dal sito: il bot non li tocca
-                    $users->updateOne(id_filter($ex['id']), ['$set' => ['ruolo' => $role, 'attivo' => true, 'co' => $isCo]]);
+                    // nome, cognome, matricola e grado li gestiscono gli amministrativi dal sito: il bot non li tocca.
+                    // Direttore, vice e coordinatori arrivano da Discord solo come "richiesta": li conferma l'amministratore.
+                    $set = ['attivo' => true, 'co' => $isCo];
+                    if ($role === $ex['ruolo']) {
+                        $set['ruolo_richiesto'] = null;
+                    } elseif (ruolo_da_confermare($role)) {
+                        if (($ex['ruolo_rifiutato'] ?? null) !== $role) {
+                            if (($ex['ruolo_richiesto'] ?? null) !== $role) {
+                                $pending++;
+                            }
+                            $set['ruolo_richiesto'] = $role;
+                        }
+                    } else {
+                        $set['ruolo'] = $role;
+                        $set['ruolo_richiesto'] = null;
+                    }
+                    if ($role !== ($ex['ruolo_rifiutato'] ?? null)) {
+                        $set['ruolo_rifiutato'] = null;
+                    }
+                    $users->updateOne(id_filter($ex['id']), ['$set' => $set]);
                     $updated++;
                 }
             }
@@ -139,9 +127,14 @@ try {
             $skipped[] = $did;
             continue;
         }
-        $pw = random_password();
-        $c = create_user($nome, $cognome, $role, $matr !== '' ? $matr : null, $did, $pw, false, $grado !== '' ? $grado : null, $isCo);
-        $created[] = ['discord_id' => $did, 'username' => $c['username'], 'password' => $pw, 'ruolo' => $role];
+        // la password non viene comunicata qui: l'amministratore usa il pulsante "Invia credenziali" del sito
+        $conferma = ruolo_da_confermare($role);
+        $c = create_user($nome, $cognome, $conferma ? 'recluta' : $role, $matr !== '' ? $matr : null, $did, random_password(), false, $grado !== '' ? $grado : null, $isCo);
+        if ($conferma) {
+            $users->updateOne(id_filter($c['id']), ['$set' => ['ruolo_richiesto' => $role]]);
+            $pending++;
+        }
+        $created[] = ['discord_id' => $did, 'username' => $c['username'], 'ruolo' => $conferma ? 'recluta' : $role, 'ruolo_richiesto' => $conferma ? $role : null];
     }
 
     if (!empty($body['deactivate_missing']) && $seen) {
@@ -153,10 +146,10 @@ try {
     }
 } catch (Throwable $ex) {
     error_log('bot_sync: ' . $ex->getMessage());
-    out(['ok' => false, 'error' => 'Errore interno'], 500);
+    bot_out(['ok' => false, 'error' => 'Errore interno'], 500);
 }
 
-out([
+bot_out([
     'ok' => true, 'created' => $created, 'passwords' => $passwords,
-    'updated' => $updated, 'deactivated' => $deactivated, 'skipped' => $skipped,
+    'updated' => $updated, 'da_confermare' => $pending, 'deactivated' => $deactivated, 'skipped' => $skipped,
 ]);

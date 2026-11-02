@@ -22,6 +22,16 @@ if ($aid !== '') {
 }
 $myShift = open_shift($user['id']);
 
+// A bordo con altre persone la scheda la compila il capo equipaggio
+if ($myShift && !empty($myShift['mezzo_id']) && !can('centralino', $user)) {
+    $mz = find_mezzo_in(board_data(), $myShift['mezzo_id']);
+    if ($mz && count($mz['crew']) > 1 && !is_crew_lead($user, $mz)) {
+        $lead = crew_lead($mz['crew']);
+        flash('La scheda di soccorso la compila il capo equipaggio' . ($lead ? ' (<b>' . e($lead['nome']) . '</b>)' : '') . '.', 'err');
+        redirect('dashboard.php');
+    }
+}
+
 // ---------- Helper HTML ----------
 function val(string $k): string
 {
@@ -201,7 +211,7 @@ page_head('Scheda di Soccorso', 'wide');
 
 <?php if ($errors): ?><div class="flash err"><?= e(implode(' ', $errors)) ?></div><?php endif; ?>
 
-<form method="post" data-once autocomplete="off">
+<form method="post" data-once data-wizard autocomplete="off">
 <?= csrf_field() ?>
 <?php if ($ass): ?><input type="hidden" name="assegnazione_id" value="<?= e($ass['id']) ?>"><?php endif; ?>
 

@@ -62,16 +62,17 @@ const ROLE_MAP = [
 // level      : gerarchia (piu' alto = piu' potere). Puoi gestire solo persone di livello pari o inferiore.
 // personale  : vede "Gestione personale", "Gestione mezzi" e lo storico shift di tutti
 // vedi_tutte : vede le schede di tutto il personale (altrimenti solo le proprie)
+// conferma    : conferma i ruoli dirigenziali richiesti da Discord (solo l'amministratore del sito)
 // centralino : puo' usare la Centrale Operativa (chiamate e assegnazione mezzi)
 // equip      : ruoli a bordo che puo' scegliere quando avvia il servizio su un mezzo
 const ROLES = [
-    'direttore'      => ['label' => 'Direttore',      'level' => 100, 'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Squadra', 'Soccorritore', 'Infermiere', 'Medico']],
-    'vice_direttore' => ['label' => 'Vice Direttore', 'level' => 90,  'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Squadra', 'Soccorritore', 'Infermiere', 'Medico']],
-    'coordinatore'   => ['label' => 'Coordinatore',   'level' => 80,  'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Squadra', 'Soccorritore', 'Infermiere', 'Medico']],
+    'direttore'      => ['label' => 'Direttore',      'level' => 100, 'conferma' => true, 'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Equipaggio', 'Soccorritore', 'Infermiere', 'Medico']],
+    'vice_direttore' => ['label' => 'Vice Direttore', 'level' => 90,  'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Equipaggio', 'Soccorritore', 'Infermiere', 'Medico']],
+    'coordinatore'   => ['label' => 'Coordinatore',   'level' => 80,  'personale' => true,  'vedi_tutte' => true,  'centralino' => true,  'equip' => ['Autista', 'Capo Equipaggio', 'Soccorritore', 'Infermiere', 'Medico']],
     'medico'         => ['label' => 'Medico',         'level' => 60,  'personale' => false, 'vedi_tutte' => true,  'centralino' => false, 'equip' => ['Medico']],
-    'infermiere'     => ['label' => 'Infermiere',     'level' => 50,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Infermiere', 'Capo Squadra']],
+    'infermiere'     => ['label' => 'Infermiere',     'level' => 50,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Infermiere', 'Capo Equipaggio']],
     'centralinista'  => ['label' => 'Centralinista',  'level' => 45,  'personale' => false, 'vedi_tutte' => false, 'centralino' => true,  'equip' => []],
-    'soccorritore'   => ['label' => 'Soccorritore',   'level' => 40,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Autista', 'Capo Squadra', 'Soccorritore']],
+    'soccorritore'   => ['label' => 'Soccorritore',   'level' => 40,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Autista', 'Capo Equipaggio', 'Soccorritore']],
     'autista'        => ['label' => 'Autista',        'level' => 30,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Autista', 'Soccorritore']],
     'recluta'        => ['label' => 'Recluta',        'level' => 10,  'personale' => false, 'vedi_tutte' => false, 'centralino' => false, 'equip' => ['Soccorritore']],
 ];

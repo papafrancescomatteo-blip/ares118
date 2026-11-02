@@ -34,6 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         col('users')->updateOne(id_filter($t['id']), ['$set' => [
             'nome' => $nome, 'cognome' => $cognome, 'username' => $username, 'username_lc' => mb_strtolower($username),
             'matricola' => $matr, 'grado' => $grado, 'ruolo' => $ruolo, 'co' => $co, 'locked' => $lock,
+            'ruolo_richiesto' => $ruolo !== $t['ruolo'] ? null : ($t['ruolo_richiesto'] ?? null),
         ]]);
         flash('Dati di <b>' . e($nome . ' ' . $cognome) . '</b> aggiornati.');
         redirect('personale.php');

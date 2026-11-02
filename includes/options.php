@@ -156,7 +156,7 @@ const MEZZI_INIT = [
 // Ruoli a bordo e posti nella scheda di soccorso (sezione 11). Il numero di posti e' il limite per mezzo.
 const RUOLI_EQUIPAGGIO = [
     'Autista'      => ['soccorritore1'],
-    'Capo Squadra' => ['soccorritore2'],
+    'Capo Equipaggio' => ['soccorritore2'],
     'Soccorritore' => ['soccorritore3'],
     'Infermiere'   => ['infermiere1', 'infermiere2', 'infermiere3'],
     'Medico'       => ['medico1', 'medico2', 'medico3'],
