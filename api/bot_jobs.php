@@ -43,12 +43,25 @@ try {
         $f = ['attivo' => true];
         if ($target === 'nuovi') {
             $f += ['cred_sent_at' => null, 'must_change_pw' => true];
+        } elseif ($target === 'selezione') {
+            $f = null;   // elenco scelto dall'amministratore
         } elseif ($target !== 'tutti') {
             $f += id_filter($target);
         }
         $items = [];
         $ids = [];
-        foreach (find_all('users', $f) as $u) {
+        if ($f === null) {
+            $cands = [];
+            foreach ((array)($job['ids'] ?? []) as $uid) {
+                $cu = find_one_by('users', id_filter((string)$uid));
+                if ($cu && !empty($cu['attivo'])) {
+                    $cands[] = $cu;
+                }
+            }
+        } else {
+            $cands = find_all('users', $f);
+        }
+        foreach ($cands as $u) {
             $did = (string)($u['discord_id'] ?? '');
             if ($did === '') {
                 continue;

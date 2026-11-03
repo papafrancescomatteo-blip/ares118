@@ -42,6 +42,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('personale.php');
     }
 
+    if ($action === 'cred_selezione') {
+        $sel = array_values(array_unique(array_filter(array_map('strval', (array)($_POST['sel'] ?? [])))));
+        $ids = [];
+        foreach (array_slice($sel, 0, 200) as $uid) {
+            $cu = find_one_by('users', id_filter($uid));
+            if ($cu && manageable($me, $cu) && !empty($cu['discord_id']) && !empty($cu['attivo'])) {
+                $ids[] = $cu['id'];
+            }
+        }
+        if (!$ids) {
+            flash('Seleziona almeno una persona attiva con ID Discord.', 'err');
+        } elseif (col('jobs')->countDocuments(['tipo' => 'credenziali', 'stato' => ['$in' => ['in_attesa', 'in_corso']]]) > 0) {
+            flash('C\'è già un invio in corso: attendi che il bot lo completi.', 'err');
+        } else {
+            col('jobs')->insertOne(['tipo' => 'credenziali', 'target' => 'selezione', 'ids' => $ids, 'stato' => 'in_attesa', 'creato_at' => time(), 'creato_da' => full_name($me)]);
+            flash('Credenziali in invio a <b>' . count($ids) . '</b> persone scelte da te: i messaggi partono entro un minuto circa.');
+        }
+        redirect('personale.php');
+    }
+
     $t = post_str('id') !== '' ? find_one_by('users', id_filter(post_str('id'))) : null;
 
     if (!$t || !manageable($me, $t)) {
@@ -122,7 +142,7 @@ page_head('Gestione personale', 'wide');
   <h2>Ruoli da confermare (<?= count($richieste) ?>)</h2>
   <p class="locknote">Discord assegna a queste persone un ruolo con poteri di gestione. Finché non lo confermi hanno il ruolo attuale.</p>
   <div class="tbl-wrap"><table class="tbl">
-    <tr><th>Persona</th><th>Ruolo attuale</th><th>Ruolo richiesto da Discord</th><th>Azioni</th></tr>
+    <tr><th><input type="checkbox" id="sel-all" title="Seleziona tutti" aria-label="Seleziona tutti"></th><th>Persona</th><th>Ruolo attuale</th><th>Ruolo richiesto da Discord</th><th>Azioni</th></tr>
     <?php foreach ($richieste as $u): $fid = 'r' . $u['id']; ?>
     <tr>
       <td><b><?= e(full_name($u)) ?></b><br><small style="color:#6b7a90"><?= e($u['grado'] ?? '') ?: e($u['username']) ?></small></td>
@@ -167,13 +187,19 @@ page_head('Gestione personale', 'wide');
   <input type="text" name="q" placeholder="Cerca nome, matricola, grado o ID…" value="<?= e($q) ?>">
   <button class="btn teal small" type="submit">Cerca</button>
   <a class="btn slate small" href="mezzi.php">Gestione mezzi</a>
+  <a class="btn blue small" href="personale_massa.php">Modifica tutti</a>
 </form>
 
+<form id="selform" method="post" class="tools" style="margin:0 0 10px;align-items:center"><?= csrf_field() ?>
+  <button class="btn blue small" name="action" value="cred_selezione" onclick="return confirm('Inviare le credenziali (nuova password temporanea) solo alle persone spuntate?')">Invia credenziali ai selezionati</button>
+  <small>Spunta le persone nella prima colonna: ricevono in DM username e una nuova password temporanea.</small>
+</form>
 <div class="tbl-wrap">
 <table class="tbl">
   <tr><th>Persona</th><th>Matricola</th><th>Grado</th><th>Ruolo</th><th>Stato</th><th>Schede</th><th>Ultimo accesso</th><th>Azioni</th></tr>
   <?php foreach ($list as $u): $ok = manageable($me, $u); $n = $counts[$u['id']] ?? 0; $fid = 'f' . $u['id']; ?>
   <tr>
+    <td><?php if ($ok && !empty($u['discord_id']) && !empty($u['attivo'])): ?><input type="checkbox" form="selform" name="sel[]" value="<?= e($u['id']) ?>" class="sel-one" aria-label="Seleziona <?= e(full_name($u)) ?>"><?php endif; ?></td>
     <td><b><?= e(full_name($u)) ?></b><br><small style="color:#6b7a90">login: <?= e($u['username']) ?><?= !empty($u['discord_id']) ? ' · ID ' . e($u['discord_id']) : '' ?></small></td>
     <td><?= e($u['matricola'] ?? '') ?: '—' ?></td>
     <td><?= e($u['grado'] ?? '') ?: '—' ?></td>
@@ -220,4 +246,5 @@ page_head('Gestione personale', 'wide');
   </form>
 </div>
 <a class="btn teal small" href="dashboard.php" style="margin-top:18px">Torna alla Dashboard</a>
+<script>document.getElementById('sel-all').addEventListener('change',function(){document.querySelectorAll('.sel-one').forEach(function(c){c.checked=this.checked}.bind(this))});</script>
 <?php page_foot();
