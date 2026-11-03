@@ -11,7 +11,7 @@ function logo_url(): string
     return 'assets/img/logo.svg';
 }
 
-function page_head(string $title, string $width = 'narrow'): void
+function page_head(string $title, string $width = 'narrow', string $theme = ''): void
 {
     $flash = flash();
     ?>
@@ -25,9 +25,9 @@ function page_head(string $title, string $width = 'narrow'): void
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=4">
+<link rel="stylesheet" href="assets/css/style.css?v=5">
 </head>
-<body>
+<body class="<?= e($theme) ?>">
 <header class="topbar"><div class="topbar-in">
   <img src="<?= e(logo_url()) ?>" alt="">
   <div class="wm"><b>ARES 118 Lazio</b><span>Unità di Emergenza · Dashboard operativa</span></div>
@@ -42,7 +42,7 @@ function page_head(string $title, string $width = 'narrow'): void
 <?php endif;
 }
 
-function page_foot(array $scripts = ['assets/js/app.js?v=2']): void
+function page_foot(array $scripts = ['assets/js/app.js?v=3']): void
 {
     ?>
 </div>

@@ -11,32 +11,62 @@ if (!$s || ((string)$s['autore_id'] !== (string)$user['id'] && !can('vedi_tutte'
     exit('Scheda non trovata.');
 }
 
-function v(?string $x): string
+// ---- Aiuti per il "modulo" (stesso aspetto del PDF del vecchio sito) ----
+function bx(?string $x, bool $big = false): string
 {
     $x = trim((string)$x);
-    return $x === '' ? '<span class="val empty">—</span>' : '<span class="val">' . e($x) . '</span>';
+    return '<span class="in' . ($big ? ' big' : '') . '">' . ($x === '' ? '&nbsp;' : e($x)) . '</span>';
 }
 
-function cell(string $label, string $htmlValue, bool $full = false): string
+function pair(string $label, string $inner, int $w = 1, string $cls = ''): string
 {
-    return '<div class="cell' . ($full ? ' full' : '') . '"><span class="lbl">' . e($label) . '</span>' . $htmlValue . '</div>';
+    return '<div class="mp ' . $cls . '" style="flex:' . $w . '"><div class="ml">' . e($label) . '</div><div class="mv">' . $inner . '</div></div>';
 }
 
-function tags($json, array $map = []): string
+function mrow(string ...$pairs): string
 {
-    $arr = is_array($json) ? $json : json_decode((string)$json, true);
-    if (!is_array($arr) || !$arr) {
-        return '<span class="val empty">—</span>';
+    return '<div class="mrow">' . implode('', $pairs) . '</div>';
+}
+
+function radios(array $opts, ?string $cur, string $cls = ''): string
+{
+    $h = '<span class="opts ' . $cls . '">';
+    foreach ($opts as $k => $label) {
+        $h .= '<span class="o"><i class="rd' . ((string)$cur === (string)$k && $cur !== null && $cur !== '' ? ' on' : '') . '"></i>' . e($label) . '</span>';
     }
-    $h = '<div class="tags">';
+    return $h . '</span>';
+}
+
+function checks(array $opts, $cur, string $cls = ''): string
+{
+    $arr = is_array($cur) ? $cur : (array)json_decode((string)$cur, true);
+    $h = '<span class="opts ' . $cls . '">';
+    foreach ($opts as $k => $label) {
+        $h .= '<span class="o"><i class="ck' . (in_array((string)$k, array_map('strval', $arr), true) ? ' on' : '') . '"></i>' . e($label) . '</span>';
+    }
+    return $h . '</span>';
+}
+
+function msec(string $title, string $body, bool $crit = false): string
+{
+    return '<div class="msec"><div class="mh' . ($crit ? ' crit' : '') . '">' . e($title) . '</div>' . $body . '</div>';
+}
+
+function chips($json): string
+{
+    $arr = is_array($json) ? $json : (array)json_decode((string)$json, true);
+    if (!$arr) {
+        return '<span class="in">&nbsp;</span>';
+    }
+    $h = '<span class="chips-v">';
     foreach ($arr as $x) {
-        $h .= '<span>' . e($map[$x] ?? $x) . '</span>';
+        $h .= '<span>' . e($x) . '</span>';
     }
-    return $h . '</div>';
+    return $h . '</span>';
 }
 
 $crew = is_array($s['equipaggio'] ?? null) ? $s['equipaggio'] : [];
-$gcsTxt = $s['gcs_tot'] !== null ? $s['gcs_tot'] . ' (E' . $s['gcs_e'] . ' V' . $s['gcs_v'] . ' M' . $s['gcs_m'] . ')' : '';
+$words = preg_match_all('/\S+/u', (string)($s['note'] ?? ''));
 
 page_head('Scheda ' . $s['numero'], 'wide');
 ?>
@@ -47,125 +77,87 @@ page_head('Scheda ' . $s['numero'], 'wide');
   <a class="btn teal small" href="dashboard.php">Dashboard</a>
 </div>
 
-<div class="sheet" id="sheet">
-  <div class="head">
-    <?= brand_block() ?>
-    <div><h1>Relazione di Soccorso</h1>
-    <p class="sub" style="margin:0">N° <b><?= e($s['numero']) ?></b> · compilata il <?= e(date('d/m/Y H:i', (int)$s['created_at'])) ?><?= !empty($s['mezzo']) ? ' · Mezzo: <b>' . e($s['mezzo']) . '</b>' : '' ?><?= !empty($s['chiamata_numero']) ? ' · Chiamata: <b>' . e($s['chiamata_numero']) . '</b>' : '' ?></p></div>
+<div class="modulo-wrap"><div class="modulo" id="sheet">
+  <div class="msec">
+    <div class="mh">1. INTESTAZIONE</div>
+    <div class="mhead">
+      <div class="mlogo"><img src="<?= e(logo_url()) ?>" alt="ARES 118"><b>ARES 118 LAZIO</b><small>Unità di Emergenza</small></div>
+      <div class="mtitle">RELAZIONE DI SOCCORSO</div>
+      <?= pair('Matricola compilatore', bx($s['matricola_comp']), 1, 'last') ?>
+    </div>
+    <div class="mmeta">N° <b><?= e($s['numero']) ?></b> · compilata il <?= e(date('d/m/Y H:i', (int)$s['created_at'])) ?><?= !empty($s['mezzo']) ? ' · Mezzo: <b>' . e($s['mezzo']) . '</b>' : '' ?><?= !empty($s['chiamata_numero']) ? ' · Chiamata: <b>' . e($s['chiamata_numero']) . '</b>' : '' ?></div>
   </div>
 
-  <div class="sec"><h2>1. Intestazione</h2>
-    <div class="cells" style="--cols:1"><?= cell('Matricola compilatore', v($s['matricola_comp'])) ?></div></div>
+  <?= msec('2. INFORMAZIONI DELLA MISSIONE',
+      mrow(pair('Codice di partenza', radios(CODICI_PARTENZA, $s['codice_partenza'], 'two'), 2), pair('Data', bx(fmt_date($s['data_intervento']))), pair('Ora attivazione', bx(fmt_time($s['ora_attivazione'])))) .
+      mrow(pair('Ora sul posto', bx(fmt_time($s['ora_posto'])), 2), pair('Numero civico', bx($s['numero_civico'])), pair('Luogo riferito', bx(LUOGHI[$s['luogo_riferito']] ?? ''))) .
+      mrow(pair('Tipo chiamata', checks(TIPI_CHIAMATA, $s['tipo_chiamata']))) .
+      mrow(pair('Condizione riferita', bx($s['condizione_riferita']))) .
+      mrow(pair('Mezzi attivati', checks(MEZZI, $s['mezzi_attivati'])))) ?>
 
-  <div class="sec"><h2>2. Informazioni della missione</h2>
-    <div class="cells" style="--cols:3">
-      <?= cell('Codice di partenza', $s['codice_partenza'] ? code_badge($s['codice_partenza']) : v('')) ?>
-      <?= cell('Data', v(fmt_date($s['data_intervento']))) ?>
-      <?= cell('Ora attivazione', v(fmt_time($s['ora_attivazione']))) ?>
-      <?= cell('Ora sul posto', v(fmt_time($s['ora_posto']))) ?>
-      <?= cell('Numero civico', v($s['numero_civico'])) ?>
-      <?= cell('Luogo riferito', v(LUOGHI[$s['luogo_riferito']] ?? '')) ?>
-      <?= cell('Tipo chiamata', tags($s['tipo_chiamata'], TIPI_CHIAMATA), true) ?>
-      <?= cell('Condizione riferita', v($s['condizione_riferita']), true) ?>
-      <?= cell('Mezzi attivati', tags($s['mezzi_attivati'], MEZZI), true) ?>
-    </div></div>
+  <?= msec('3. DATI PAZIENTE',
+      mrow(pair('Nome', bx($s['pz_nome'])), pair('Cognome', bx($s['pz_cognome'])), pair('Data di nascita', bx(fmt_date($s['pz_data_nascita']))), pair('Età', bx($s['pz_eta'] !== null ? (string)$s['pz_eta'] : '')), pair('Sesso', radios(['M' => 'M', 'F' => 'F'], $s['pz_sesso']))) .
+      mrow(pair('Cittadinanza', bx($s['pz_cittadinanza'])), pair('Indirizzo', bx($s['pz_indirizzo']), 3))) ?>
 
-  <div class="sec"><h2>3. Dati paziente</h2>
-    <div class="cells" style="--cols:4">
-      <?= cell('Nome', v($s['pz_nome'])) ?>
-      <?= cell('Cognome', v($s['pz_cognome'])) ?>
-      <?= cell('Data di nascita', v(fmt_date($s['pz_data_nascita']))) ?>
-      <?= cell('Età', v($s['pz_eta'] !== null ? (string)$s['pz_eta'] : '')) ?>
-      <?= cell('Sesso', v($s['pz_sesso'])) ?>
-      <?= cell('Cittadinanza', v($s['pz_cittadinanza'])) ?>
-      <?= cell('Indirizzo', v($s['pz_indirizzo']), true) ?>
-    </div></div>
+  <?= msec('4. EVENTO',
+      mrow(pair('Patologia riscontrata all\'arrivo', bx($s['patologia'])), pair('Dinamica riscontrata', bx($s['dinamica'])), pair('Codice patologia riscontrata', bx($s['codice_patologia']))) .
+      mrow(pair('Posizione paziente all\'arrivo', radios(POSIZIONI, $s['posizione'], 'wide')))) ?>
 
-  <div class="sec"><h2>4. Evento</h2>
-    <div class="cells" style="--cols:3">
-      <?= cell("Patologia riscontrata all'arrivo", v($s['patologia'])) ?>
-      <?= cell('Dinamica riscontrata', v($s['dinamica'])) ?>
-      <?= cell('Codice patologia', v($s['codice_patologia'])) ?>
-      <?= cell("Posizione paziente all'arrivo", v(POSIZIONI[$s['posizione']] ?? ''), true) ?>
-    </div></div>
+  <?= msec('5. VALUTAZIONE PARAMETRI',
+      mrow(pair('Respiro', bx($s['respiro']), 2), pair('Polso', bx($s['polso'])), pair('Pupille', bx($s['pupille']))) .
+      mrow(pair('Pressione arteriosa', bx($s['pressione']), 2), pair('Freq. respiratoria', bx($s['freq_resp'])), pair('Saturazione', bx($s['saturazione']))) .
+      mrow(pair('Glasgow Coma Scale (sanitari)', '<span class="gcs">' . bx(GCS_E[$s['gcs_e']] ?? '', true) . bx(GCS_V[$s['gcs_v']] ?? '', true) . bx(GCS_M[$s['gcs_m']] ?? '', true) . '</span>')) .
+      mrow(pair('Punteggio GCS totale', bx($s['gcs_tot'] !== null ? (string)$s['gcs_tot'] : '') . '<small class="hn">13-15 lieve · 9-12 moderata · ≤ 8 grave (considerare vie aeree)</small>', 2), pair('Glicemia', bx($s['glicemia'])), pair('Colorito cute', bx($s['colorito_cute']))) .
+      mrow(pair('Temperatura', bx($s['temperatura']), 2), pair('AVPU', radios(AVPU, $s['avpu']), 2)), true) ?>
 
-  <div class="sec crit"><h2>5. Valutazione parametri</h2>
-    <div class="cells" style="--cols:3">
-      <?= cell('Respiro', v($s['respiro'])) ?>
-      <?= cell('Polso', v($s['polso'])) ?>
-      <?= cell('Pupille', v($s['pupille'])) ?>
-      <?= cell('Pressione arteriosa', v($s['pressione'])) ?>
-      <?= cell('Freq. respiratoria', v($s['freq_resp'])) ?>
-      <?= cell('Saturazione', v($s['saturazione'])) ?>
-      <?= cell('Glasgow Coma Scale', v($gcsTxt)) ?>
-      <?= cell('Glicemia', v($s['glicemia'])) ?>
-      <?= cell('Colorito cute', v($s['colorito_cute'])) ?>
-      <?= cell('Temperatura', v($s['temperatura'])) ?>
-      <?= cell('AVPU', v(AVPU[$s['avpu']] ?? ''), true) ?>
-    </div></div>
+  <?= msec('6. PRESTAZIONI EFFETTUATE',
+      mrow(pair('Trattamenti', chips($s['trattamenti']))) .
+      mrow(pair('Farmaci / note intervento', bx($s['farmaci_note'])))) ?>
 
-  <div class="sec"><h2>6. Prestazioni effettuate</h2>
-    <div class="cells" style="--cols:1">
-      <?= cell('Trattamenti', tags($s['trattamenti'])) ?>
-      <?= cell('Farmaci / note', v($s['farmaci_note'])) ?>
-    </div></div>
+  <?= msec('7. EVENTI CRITICI',
+      mrow(pair('Decesso', radios(['SI' => 'SI', 'NO' => 'NO'], $s['decesso'])), pair('Ora decesso', bx(fmt_time($s['ora_decesso']))), pair('Data decesso', bx(fmt_date($s['data_decesso'])))) .
+      mrow(pair('Medico che constata', bx($s['medico_constata']), 2), pair('Firma', bx($s['firma_decesso']))) .
+      mrow(pair('Arresto cardiaco', radios(['SI' => 'SI', 'NO' => 'NO'], $s['arresto_cardiaco'])), pair('Scariche DAE', bx($s['scariche_dae']), 2)), true) ?>
 
-  <div class="sec crit"><h2>7. Eventi critici</h2>
-    <div class="cells" style="--cols:2">
-      <?= cell('Decesso', v($s['decesso'])) ?>
-      <?= cell('Ora decesso', v(fmt_time($s['ora_decesso']))) ?>
-      <?= cell('Data decesso', v(fmt_date($s['data_decesso']))) ?>
-      <?= cell('Medico che constata', v($s['medico_constata'])) ?>
-      <?= cell('Firma', v($s['firma_decesso'])) ?>
-      <?= cell('Arresto cardiaco', v($s['arresto_cardiaco'])) ?>
-      <?= cell('Scariche DAE', v($s['scariche_dae']), true) ?>
-    </div></div>
+  <?= msec('8. RIFIUTI',
+      mrow(pair('Rifiuto trasporto', radios(['SI' => 'SI', 'NO' => 'NO'], $s['rifiuto_trasporto'])), pair('Firma rifiuto', bx($s['firma_rifiuto']))) .
+      mrow(pair('Rifiuto presidi', radios(['SI' => 'SI', 'NO' => 'NO'], $s['rifiuto_presidi'])), pair('Presidi rifiutati', bx($s['presidi_rifiutati']))), true) ?>
 
-  <div class="sec"><h2>8. Rifiuti</h2>
-    <div class="cells" style="--cols:2">
-      <?= cell('Rifiuto trasporto', v($s['rifiuto_trasporto'])) ?>
-      <?= cell('Firma rifiuto', v($s['firma_rifiuto'])) ?>
-      <?= cell('Rifiuto presidi', v($s['rifiuto_presidi'])) ?>
-      <?= cell('Presidi rifiutati', v($s['presidi_rifiutati'])) ?>
-    </div></div>
+  <?= msec('9. STATO TRASPORTO / CODICE',
+      mrow(pair('Codice rientro', radios(CODICI_RIENTRO, $s['codice_rientro']), 2), pair('Destinazione', bx($s['destinazione']))) .
+      mrow(pair('Ora inizio trasporto PS', bx(fmt_time($s['ora_inizio_trasporto'])), 2), pair('Ora arrivo PS', bx(fmt_time($s['ora_arrivo_ps']))))) ?>
 
-  <div class="sec"><h2>9. Stato trasporto / codice</h2>
-    <div class="cells" style="--cols:2">
-      <?= cell('Codice rientro', $s['codice_rientro'] ? code_badge($s['codice_rientro']) : v('')) ?>
-      <?= cell('Destinazione', v($s['destinazione'])) ?>
-      <?= cell('Ora inizio trasporto PS', v(fmt_time($s['ora_inizio_trasporto']))) ?>
-      <?= cell('Ora arrivo PS', v(fmt_time($s['ora_arrivo_ps']))) ?>
-    </div></div>
+  <?= msec('10. ANNOTAZIONI / ANAMNESI',
+      mrow(pair('Note', bx($s['note'], true))) . '<div class="mfoot"><b>Parole inserite: ' . (int)$words . '</b></div>') ?>
 
-  <div class="sec"><h2>10. Annotazioni / Anamnesi</h2>
-    <div class="cells" style="--cols:1"><?= cell('Note', v($s['note'])) ?></div></div>
-
-  <div class="sec"><h2>11. Dati compilatore e firme</h2>
-    <div class="cells" style="--cols:3">
-      <?= cell('Nome', v($s['comp_nome'])) ?>
-      <?= cell('Cognome', v($s['comp_cognome'])) ?>
-      <?= cell('Ruolo', v($s['comp_ruolo'])) ?>
-    </div>
-    <div class="crew">
-      <?php foreach (EQUIPAGGIO as $k => $label): ?>
-        <?= cell($label, v($crew[$k] ?? '')) ?>
-      <?php endforeach; ?>
-    </div></div>
-</div>
+  <?php
+  $firme = '';
+  foreach (EQUIPAGGIO as $k => $label) {
+      $firme .= '<div class="fc"><small>' . e($label) . '</small>' . bx($crew[$k] ?? '') . '</div>';
+  }
+  echo msec('11. DATI COMPILATORE E FIRME',
+      mrow(pair('Nome', bx($s['comp_nome'])), pair('Cognome', bx($s['comp_cognome'])), pair('Ruolo', bx($s['comp_ruolo']), 2)) .
+      '<div class="mfoot">I dati del compilatore sono precompilati automaticamente e non modificabili per garantire la tracciabilità.</div>' .
+      '<div class="mfoot up">Nominativi dei firmatari dell\'equipaggio</div><div class="firme">' . $firme . '</div>');
+  ?>
+</div></div>
 
 <script>
 (function () {
   function download() {
     var el = document.getElementById('sheet');
     if (!window.html2pdf) { window.print(); return; }
+    var w = 1240;                      // larghezza fissa: il PDF e' sempre uguale su qualsiasi schermo
+    el.style.width = w + 'px';
+    var h = el.offsetHeight;
     html2pdf().set({
-      margin: 8,
+      margin: 0,
       filename: 'scheda-<?= e($s['numero']) ?>.pdf',
       image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], avoid: '.sec' }
-    }).from(el).save();
+      html2canvas: { scale: 2, useCORS: true, width: w, windowWidth: w, scrollX: 0, scrollY: 0 },
+      jsPDF: { unit: 'px', format: [w, h], orientation: 'portrait', hotfixes: ['px_scaling'] },
+      pagebreak: { mode: [] }
+    }).from(el).save().then(function () { el.style.width = ''; }, function () { el.style.width = ''; });
   }
   document.getElementById('btn-pdf').addEventListener('click', download);
   <?php if (!empty($_GET['pdf'])): ?>window.addEventListener('load', function () { setTimeout(download, 400); });<?php endif; ?>

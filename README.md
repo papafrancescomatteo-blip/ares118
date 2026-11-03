@@ -98,6 +98,19 @@ il bot non le sovrascrive finché non premi "Affida al bot".
 - **Conferma ruoli**: Direttore, Vice Direttore e Coordinatori arrivano da Discord solo come *richiesta*. Finché l'amministratore del sito (ruolo Direttore) non preme **Conferma** in *Gestione personale*, la persona resta con il ruolo attuale (i nuovi account partono come Recluta). "Rifiuta" ricorda la scelta: il bot non richiede lo stesso ruolo.
 - Per il bot: aggiungi `bot/ares_sync.js` (Node, discord.js v14) o `bot/ares_sync.py` (discord.py) al tuo bot e imposta `ARES_SITE_URL`, `ARES_BOT_TOKEN` (= `BOT_TOKEN` di Render), `ARES_GUILD_ID` (vedi `bot/.env.esempio`).
 
+## 3d. Se il bot non invia i DM
+
+1. In **Gestione personale** guarda il riquadro "Bot": deve dire *collegato* (ultimo contatto pochi secondi fa). Se non lo è, il modulo non è caricato o il token non coincide con `BOT_TOKEN` di Render.
+2. Il modulo legge da solo il file `.env` accanto a `ares_sync.js` (`ARES_SITE_URL`, `ARES_BOT_TOKEN`, `ARES_GUILD_ID`).
+3. Sul server Discord, come amministratore: `!ares-stato` mostra il collegamento, `!ares-invia` forza l'invio delle credenziali in sospeso.
+4. Gli utenti devono avere i DM aperti ai membri del server; altrimenti compaiono come "non raggiunti" e si può riprovare.
+
+## 3e. Aspetto, tablet e PDF
+
+- Tema blu scuro con sfumature rosse (home, login, tablet, centrale operativa); le schede restano chiare per la lettura.
+- All'avvio del servizio con un mezzo si apre il **tablet di bordo**: solo chiamate in arrivo, schede da compilare, equipaggio e i due pulsanti *Metti in pausa* / *Termina servizio*. Suono a campana (tre note + nota acuta), annuncio vocale in italiano, vibrazione, schermo sempre acceso; alla prima apertura serve un tocco su "Attiva audio e continua" (regola dei browser).
+- Il PDF della scheda è una pagina unica nel modulo "Relazione di soccorso" (intestazioni blu/rosse, etichette azzurre, caselle bianche). Si genera nel browser (html2pdf da cdnjs): serve internet sul dispositivo.
+
 ## 4. Personalizzare
 
 * **Logo**: metti `logo.png` (o `.jpg`/`.webp`/`.svg`) in `assets/img/`. Se c'è, sostituisce quello di esempio.

@@ -25,6 +25,22 @@ import discord
 import requests
 from discord.ext import commands, tasks
 
+def _load_env():
+    """Se il bot non carica il file .env, lo legge il modulo (cerca .env accanto a questo file e nella cartella di avvio)."""
+    if all(os.environ.get(k) for k in ("ARES_SITE_URL", "ARES_BOT_TOKEN", "ARES_GUILD_ID")):
+        return
+    for d in (os.path.dirname(os.path.abspath(__file__)), os.getcwd()):
+        try:
+            with open(os.path.join(d, ".env"), encoding="utf-8") as f:
+                for line in f:
+                    k, sep, v = line.strip().partition("=")
+                    if sep and k.startswith("ARES_") and not os.environ.get(k):
+                        os.environ[k] = v.strip().strip("\"'")
+        except OSError:
+            pass
+
+
+_load_env()
 SITE = os.environ.get("ARES_SITE_URL", "").rstrip("/")
 TOKEN = os.environ.get("ARES_BOT_TOKEN", "")
 GUILD_ID = int(os.environ.get("ARES_GUILD_ID", "0") or 0)
@@ -91,8 +107,16 @@ class AresSync(commands.Cog):
         res = await asyncio.to_thread(call_site, "bot_sync.php", build_payload(guild, reset_for))
         return guild, res
 
+    @staticmethod
+    def reason(ex):
+        if getattr(ex, "code", None) == 50007:
+            return "DM chiusi o bloccati"
+        if "membro non trovato" in str(ex):
+            return "non è nel server"
+        return str(ex)[:60]
+
     async def send_credentials(self, guild, items):
-        sent, failed = [], []
+        sent, failed, errors = [], [], {}
         for it in items or []:
             m = guild.get_member(int(it["discord_id"]))
             try:
@@ -100,10 +124,12 @@ class AresSync(commands.Cog):
                     raise RuntimeError("membro non trovato")
                 await m.send(dm_text(it))
                 sent.append(it["discord_id"])
-            except Exception:
+            except Exception as ex:
                 failed.append(it["discord_id"])
+                errors[it["discord_id"]] = self.reason(ex)
+                print("[ARES] DM non inviato a", it["username"], "-", errors[it["discord_id"]])
             await asyncio.sleep(1.2)  # evita i limiti di velocita' di Discord
-        return sent, failed
+        return sent, failed, errors
 
     @tasks.loop(minutes=30)
     async def loop_sync(self):
@@ -114,27 +140,32 @@ class AresSync(commands.Cog):
         except Exception as ex:
             print("[ARES] sync fallita:", ex)
 
-    @tasks.loop(seconds=60)
-    async def loop_jobs(self):
+    async def run_jobs(self):
         if self.busy:
-            return
+            return "occupato"
         self.busy = True
         try:
-            p = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "peek"})
-            if not p.get("pending"):
-                return
+            pend = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "peek"})
+            if not pend.get("pending"):
+                return "nessun invio richiesto dal sito"
             guild, _ = await self.sync()  # prima crea gli account di chi e' appena arrivato
             job = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "claim"})
             if not job.get("job_id"):
-                return
-            sent, failed = await self.send_credentials(guild, job.get("items"))
-            await asyncio.to_thread(call_site, "bot_jobs.php",
-                                    {"action": "report", "job_id": job["job_id"], "sent": sent, "failed": failed})
+                return "nessun destinatario"
+            sent, failed, errors = await self.send_credentials(guild, job.get("items"))
+            await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "report", "job_id": job["job_id"],
+                                                                 "sent": sent, "failed": failed, "errors": errors})
             print("[ARES] credenziali inviate:", len(sent), "non consegnate:", len(failed))
+            return f"inviati {len(sent)}, non consegnati {len(failed)}"
         except Exception as ex:
             print("[ARES] invio credenziali fallito:", ex)
+            return f"errore: {ex}"
         finally:
             self.busy = False
+
+    @tasks.loop(seconds=60)
+    async def loop_jobs(self):
+        await self.run_jobs()
 
     @loop_sync.before_loop
     @loop_jobs.before_loop
@@ -143,14 +174,25 @@ class AresSync(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, msg: discord.Message):
-        if msg.author.bot or not msg.guild or not msg.content.startswith("!resetpw"):
+        if msg.author.bot or not msg.guild or not msg.author.guild_permissions.administrator:
             return
-        if not msg.author.guild_permissions.administrator or not msg.mentions:
+        if msg.content.startswith("!ares-stato"):  # controlla il collegamento con il sito
+            try:
+                pend = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "peek"})
+                await msg.reply(f"Collegato al sito. Invii in attesa: {'sì' if pend.get('pending') else 'no'}.", mention_author=False)
+            except Exception as ex:
+                await msg.reply(f"Non riesco a parlare col sito: {ex}", mention_author=False)
+            return
+        if msg.content.startswith("!ares-invia"):  # esegue subito l'invio richiesto dal sito
+            await msg.reply("Controllo le richieste del sito…", mention_author=False)
+            await msg.reply("Esito: " + await self.run_jobs(), mention_author=False)
+            return
+        if not msg.content.startswith("!resetpw") or not msg.mentions:
             return
         try:
             guild, res = await self.sync({str(msg.mentions[0].id)})
             items = [dict(x, nome=x["username"]) for x in res.get("passwords", [])]
-            sent, _ = await self.send_credentials(guild, items)
+            sent, _, _ = await self.send_credentials(guild, items)
             await msg.reply("Nuova password inviata in DM." if sent else "Non riesco a scrivere in DM a questa persona.",
                             mention_author=False)
         except Exception as ex:

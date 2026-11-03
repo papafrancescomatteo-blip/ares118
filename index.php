@@ -34,8 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-page_head('Login');
+page_head('Login', 'narrow', 'dark flat');
 ?>
+<div class="card login-card">
+<img class="logo-big" src="<?= e(logo_url()) ?>" alt="ARES 118">
 <h1>Accedi al turno</h1>
 <p class="sub">Dashboard operativa ARES 118: schede di soccorso, mezzi e Centrale Operativa.</p>
 <?php if ($error): ?><div class="flash err"><?= e($error) ?></div><?php endif; ?>
@@ -51,4 +53,5 @@ page_head('Login');
   </div>
   <button class="btn teal" type="submit">Entra</button>
 </form>
-<?php page_foot(['assets/js/app.js?v=2']);
+</div>
+<?php page_foot(['assets/js/app.js?v=3']);

@@ -99,6 +99,9 @@ foreach (col('schede')->aggregate([['$group' => ['_id' => '$autore_id', 'n' => [
 
 $richieste = array_values(array_filter(find_all('users', ['ruolo_richiesto' => ['$ne' => null]]), static fn($u) => !empty($u['ruolo_richiesto']) && isset(ROLES[$u['ruolo_richiesto']])));
 $lastJob = find_all('jobs', ['tipo' => 'credenziali'], ['sort' => ['creato_at' => -1], 'limit' => 1])[0] ?? null;
+$botDoc = (array)(col('settings')->findOne(['_id' => 'bot']) ?? []);
+$botSeen = (int)($botDoc['seen_at'] ?? 0);
+$botUnauth = (int)($botDoc['unauth_at'] ?? 0);
 $nuoviSenzaCred = 0;
 foreach ($list as $u) {
     if (!empty($u['discord_id']) && !empty($u['attivo']) && empty($u['cred_sent_at']) && !empty($u['must_change_pw'])) {
@@ -139,6 +142,15 @@ page_head('Gestione personale', 'wide');
 <div class="box">
   <h3>Credenziali di accesso</h3>
   <p>Il bot crea gli account da Discord ma non scrive a nessuno finché non lo chiedi qui. Ogni persona riceve in messaggio privato username e una <b>password temporanea</b> da cambiare al primo accesso.</p>
+  <?php if ($botSeen && time() - $botSeen < 240): ?>
+    <p class="botst ok">Bot collegato · ultimo contatto <?= e(date('H:i:s', $botSeen)) ?></p>
+  <?php elseif ($botSeen): ?>
+    <p class="botst warn">Il bot non si fa sentire dalle <?= e(date('H:i', $botSeen)) ?> (<?= (int)((time() - $botSeen) / 60) ?> minuti fa): controlla che sia acceso.</p>
+  <?php elseif ($botUnauth): ?>
+    <p class="botst warn">Il bot contatta il sito ma il token non coincide: <b>ARES_BOT_TOKEN</b> sul bot deve essere uguale a <b>BOT_TOKEN</b> su Render.</p>
+  <?php else: ?>
+    <p class="botst warn">Il bot non si è mai collegato: controlla che <code>require('./ares_sync')(client)</code> sia in index.js e che le variabili ARES_* siano nel .env.</p>
+  <?php endif; ?>
   <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px"><?= csrf_field() ?>
     <button class="btn teal small" name="action" value="cred_nuovi" onclick="return confirm('Inviare le credenziali a chi non le ha ancora ricevute?')">Invia credenziali a chi non le ha ricevute (<?= (int)$nuoviSenzaCred ?>)</button>
     <button class="btn slate small" name="action" value="cred_tutti" onclick="return confirm('Genera una NUOVA password per TUTTI e la invia in DM, anche a chi ha già accesso. Continuare?')">Reinvia a tutti (nuove password)</button>
@@ -146,7 +158,7 @@ page_head('Gestione personale', 'wide');
   <?php if ($lastJob): ?>
   <p style="margin-top:10px"><small>Ultimo invio, <?= e(date('d/m/Y H:i', (int)$lastJob['creato_at'])) ?>:
     <?php if (($lastJob['stato'] ?? '') === 'completato'): ?>
-      <b><?= (int)($lastJob['inviati'] ?? 0) ?></b> inviati<?php if (!empty($lastJob['falliti'])): ?>, <b>non consegnati</b> (messaggi privati chiusi): <?= e(implode(', ', (array)$lastJob['falliti'])) ?>. Per loro usa "Reset pw" e consegna la password a mano.<?php endif; ?>
+      <b><?= (int)($lastJob['inviati'] ?? 0) ?></b> inviati<?php if (!empty($lastJob['falliti'])): ?>, <b>non consegnati</b>: <?= e(implode(', ', (array)$lastJob['falliti'])) ?>. Per loro usa "Reset pw" e consegna la password a mano.<?php endif; ?>
     <?php else: ?><b>in corso</b> (il bot lo prende entro un minuto)<?php endif; ?></small></p>
   <?php endif; ?>
 </div>

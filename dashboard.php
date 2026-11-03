@@ -66,9 +66,12 @@ function pannello_interventi(array $mine, ?array $lead, array $user): void
     <?php endforeach;
 }
 
-page_head('Dashboard', $tablet ? 'wide' : 'narrow');
+page_head('Dashboard', $tablet ? 'wide' : 'wide', $tablet ? 'dark flat tabletmode' : 'dark flat');
 
 if ($tablet): ?>
+<div id="sound-gate" class="sound-gate" hidden>
+  <div><h2>Tablet di bordo</h2><p>Tocca per attivare il suono delle chiamate, lo schermo intero e lo schermo sempre acceso.</p><button type="button" id="gate-go" class="btn red">Attiva audio e continua</button></div>
+</div>
 <div class="tablet">
   <div class="tb-bar">
     <div class="tb-id">
@@ -84,7 +87,7 @@ if ($tablet): ?>
     <button type="button" id="alert-silence" class="btn small orange">Silenzia</button>
   </div>
   <div id="audio-bar" class="audio-bar" hidden>
-    <span>Per sentire il suono delle chiamate attiva l'audio su questo dispositivo.</span>
+    <span>Audio non ancora attivo su questo dispositivo: senza, le chiamate non suonano.</span>
     <button type="button" id="audio-unlock" class="btn small teal">Attiva audio</button>
   </div>
 
@@ -102,100 +105,105 @@ if ($tablet): ?>
     <?php pannello_interventi($mine, $lead, $user); ?>
   </div>
 
-  <div class="tb-nav">
-    <?php if ($mine['capo'] || count($myMezzo['crew']) === 1): ?><a class="btn blue" href="scheda_nuova.php">Scheda libera</a><?php endif; ?>
-    <a class="btn slate" href="schede.php">Le mie schede</a>
-    <a class="btn slate" href="shifts.php">Storico shift</a>
-    <?php if ($isCo): ?><a class="btn slate" href="centralino.php">Centrale Operativa (chiamate)</a><?php endif; ?>
-    <?php if ($isAll): ?><a class="btn slate" href="schede.php?scope=tutte">Schede di tutti</a><?php endif; ?>
-    <?php if ($isPers): ?>
-      <a class="btn slate" href="shifts.php?scope=tutti">Shift di tutti</a>
-      <a class="btn slate" href="personale.php">Gestione personale</a>
-      <a class="btn slate" href="mezzi.php">Gestione mezzi</a>
-    <?php endif; ?>
-    <a class="btn slate" href="password.php">Cambia password</a>
-  </div>
-
   <form method="post" action="servizio.php" class="tb-service" data-once>
     <?= csrf_field() ?>
     <button class="btn orange" name="action" value="pause" type="submit"><?= $state === 'In pausa' ? 'Riprendi servizio' : 'Metti in pausa' ?></button>
     <button class="btn red" name="action" value="end" type="submit">Termina servizio</button>
   </form>
   <p class="tb-foot"><?= e(full_name($user)) ?> · matricola <?= e($user['matricola'] ?? '—') ?> · <?= e($user['grado'] ?? '') ?: 'grado non assegnato' ?></p>
-  <form method="post" action="logout.php"><?= csrf_field() ?><button class="btn slate" type="submit">Esci</button></form>
 </div>
 <?php page_foot(); exit; endif; ?>
 
-<h1>Dashboard ARES 118</h1>
-<p class="sub">Benvenuto, <b><?= e(full_name($user)) ?></b></p>
-
-<div class="box">
-  <h3>Il tuo profilo</h3>
-  <p>Nome e cognome: <b><?= e(full_name($user)) ?></b></p>
-  <p>Matricola: <?= !empty($user['matricola']) ? '<b>' . e($user['matricola']) . '</b>' : '<i>non ancora assegnata</i>' ?></p>
-  <p>Grado: <?= !empty($user['grado']) ? '<b>' . e($user['grado']) . '</b>' : '<i>non ancora assegnato</i>' ?></p>
-  <p>Ruolo sul sito: <b><?= e($role['label']) ?></b><?= !empty($user['co']) ? ' · abilitato Centrale Operativa' : '' ?></p>
-  <?php if (!empty($user['ruolo_richiesto']) && isset(ROLES[$user['ruolo_richiesto']])): ?>
-  <p>Ruolo richiesto da Discord: <b><?= e(ROLES[$user['ruolo_richiesto']]['label']) ?></b> · <i>in attesa di conferma dell'amministratore</i></p>
-  <?php endif; ?>
-</div>
-
-<?php if ($shift && !$myMezzo): ?>
-<div class="box info">
-  <h3>Sei in Centrale Operativa</h3>
-  <p>Postazione: <b>Centrale Operativa</b> · in servizio dalle <?= e(hm($shift['start_at'])) ?>.</p>
-  <a class="btn red" href="centralino.php">Apri la Centrale Operativa (chiamate)</a>
-</div>
-<?php endif; ?>
-
-<div class="box">
-  <h3>Firma Servizio</h3>
-  <p>Stato attuale: <b><?= e($state) ?></b><?php if ($shift): ?> · dalle <?= e(hm($shift['start_at'])) ?> (<?= e(fmt_duration(shift_net_seconds($shift))) ?> effettive)<?php endif; ?></p>
-  <?php if ($shift): ?>
-    <p>Postazione: <b>Centrale Operativa</b> · Ruolo: <b><?= e($shift['ruolo_eq'] ?? '—') ?></b></p>
-  <?php else: ?>
-    <p>Scegli mezzo e ruolo: dopo l'avvio si apre il tablet di bordo con le chiamate del tuo equipaggio.</p>
-  <?php endif; ?>
-  <form method="post" action="servizio.php" data-once>
-    <?= csrf_field() ?>
-    <?php if (!$shift): ?>
-    <div class="field" style="margin-top:12px"><label for="mezzo">Equipaggio / mezzo</label>
-      <select name="mezzo" id="mezzo" required>
-        <option value="">– Seleziona il mezzo –</option>
-        <?php if ($isCo): ?><option value="CO">Centrale Operativa (CO)</option><?php endif; ?>
-        <?php $grp = null; foreach ($board['mezzi'] as $m): if (empty($m['attivo'])) { continue; }
-          if ($m['gruppo'] !== $grp) { if ($grp !== null) { echo '</optgroup>'; } $grp = $m['gruppo']; echo '<optgroup label="' . e($grp) . '">'; } ?>
-          <option value="<?= e($m['id']) ?>"><?= e(mezzo_label($m)) ?><?= $m['crew'] ? ' · ' . count($m['crew']) . ' a bordo' : '' ?></option>
-        <?php endforeach; if ($grp !== null) { echo '</optgroup>'; } ?>
-      </select></div>
-    <?php if ($crewRoles): ?>
-    <div class="field"><label for="ruolo_eq">Ruolo a bordo</label>
-      <select name="ruolo_eq" id="ruolo_eq">
-        <?php foreach ($crewRoles as $r): ?><option><?= e($r) ?></option><?php endforeach; ?>
-      </select></div>
-    <?php endif; ?>
-    <?php endif; ?>
-    <div class="btn-row">
-      <button class="btn teal" name="action" value="start" type="submit"<?= $shift ? ' disabled' : '' ?>>Avvia Servizio</button>
-      <button class="btn orange" name="action" value="pause" type="submit"<?= $shift ? '' : ' disabled' ?>><?= $state === 'In pausa' ? 'Riprendi Servizio' : 'Metti in Pausa' ?></button>
-      <button class="btn red" name="action" value="end" type="submit"<?= $shift ? '' : ' disabled' ?>>Termina Servizio</button>
+<?php
+$ini = mb_strtoupper(mb_substr((string)($user['nome'] ?? $user['username'] ?? '?'), 0, 1) . mb_substr((string)($user['cognome'] ?? ''), 0, 1));
+$pend = (!empty($user['ruolo_richiesto']) && isset(ROLES[$user['ruolo_richiesto']])) ? ROLES[$user['ruolo_richiesto']]['label'] : '';
+?>
+<div class="home">
+  <section class="hero">
+    <div class="hero-id">
+      <div class="avatar"><?= e($ini) ?></div>
+      <div>
+        <p>Buon servizio,</p>
+        <h1><?= e(full_name($user)) ?></h1>
+      </div>
     </div>
-  </form>
-  <a class="btn slate" href="shifts.php">Storico Shift</a>
-  <a class="btn slate" href="schede.php">Le mie schede di soccorso</a>
-  <a class="btn blue" href="scheda_nuova.php">Compila Scheda di Soccorso</a>
-  <?php if ($isCo): ?><a class="btn red" href="centralino.php">Centrale Operativa (chiamate)</a><?php endif; ?>
-  <?php if ($isAll): ?><a class="btn slate" href="schede.php?scope=tutte">Storico schede (tutto il personale)</a><?php endif; ?>
-  <?php if ($isPers): ?>
-    <a class="btn slate" href="shifts.php?scope=tutti">Storico shift (tutto il personale)</a>
-    <a class="btn slate" href="personale.php">Gestione personale</a>
-    <a class="btn slate" href="mezzi.php">Gestione mezzi</a>
-  <?php endif; ?>
-</div>
+    <div class="hero-tags">
+      <span><?= e($role['label']) ?></span>
+      <span>Matricola <?= !empty($user['matricola']) ? e($user['matricola']) : 'non assegnata' ?></span>
+      <span><?= !empty($user['grado']) ? e($user['grado']) : 'Grado non assegnato' ?></span>
+      <?php if (!empty($user['co'])): ?><span>Abilitato Centrale Operativa</span><?php endif; ?>
+      <?php if ($pend): ?><span class="pend">Ruolo richiesto: <?= e($pend) ?> · in attesa di conferma</span><?php endif; ?>
+    </div>
+  </section>
 
-<a class="btn slate" href="password.php" style="margin-top:0;margin-bottom:12px">Cambia password</a>
-<form method="post" action="logout.php">
-  <?= csrf_field() ?>
-  <button class="btn red" type="submit" style="margin-top:0">Logout</button>
-</form>
+  <div class="home-grid">
+    <section class="card">
+      <h2>Servizio</h2>
+      <div class="state-line"><span class="badge <?= $shift ? ($state === 'In pausa' ? 'man' : 'on') : 'idle' ?>"><?= e($state) ?></span>
+        <?php if ($shift): ?><span class="sub" style="margin:0">dalle <?= e(hm($shift['start_at'])) ?> · <?= e(fmt_duration(shift_net_seconds($shift))) ?> effettive</span><?php endif; ?></div>
+      <?php if ($shift && !$myMezzo): ?>
+        <div class="box info"><b>Sei in Centrale Operativa.</b> Ruolo: <?= e($shift['ruolo_eq'] ?? '—') ?></div>
+        <a class="btn red" href="centralino.php">Apri la Centrale Operativa</a>
+      <?php elseif (!$shift): ?>
+        <p class="sub">Scegli mezzo e ruolo: all'avvio si apre il tablet di bordo con chiamate e schede da compilare.</p>
+      <?php endif; ?>
+      <form method="post" action="servizio.php" data-once>
+        <?= csrf_field() ?>
+        <?php if (!$shift): ?>
+        <div class="field"><label for="mezzo">Equipaggio / mezzo</label>
+          <select name="mezzo" id="mezzo" required>
+            <option value="">– Seleziona il mezzo –</option>
+            <?php if ($isCo): ?><option value="CO">Centrale Operativa (CO)</option><?php endif; ?>
+            <?php $grp = null; foreach ($board['mezzi'] as $m): if (empty($m['attivo'])) { continue; }
+              if ($m['gruppo'] !== $grp) { if ($grp !== null) { echo '</optgroup>'; } $grp = $m['gruppo']; echo '<optgroup label="' . e($grp) . '">'; } ?>
+              <option value="<?= e($m['id']) ?>"><?= e(mezzo_label($m)) ?><?= $m['crew'] ? ' · ' . count($m['crew']) . ' a bordo' : '' ?></option>
+            <?php endforeach; if ($grp !== null) { echo '</optgroup>'; } ?>
+          </select></div>
+        <?php if ($crewRoles): ?>
+        <div class="field"><label for="ruolo_eq">Ruolo a bordo</label>
+          <select name="ruolo_eq" id="ruolo_eq">
+            <?php foreach ($crewRoles as $r): ?><option><?= e($r) ?></option><?php endforeach; ?>
+          </select></div>
+        <?php endif; ?>
+        <?php endif; ?>
+        <div class="btn-row">
+          <button class="btn teal" name="action" value="start" type="submit"<?= $shift ? ' disabled' : '' ?>>Avvia Servizio</button>
+          <button class="btn orange" name="action" value="pause" type="submit"<?= $shift ? '' : ' disabled' ?>><?= $state === 'In pausa' ? 'Riprendi Servizio' : 'Metti in Pausa' ?></button>
+          <button class="btn red" name="action" value="end" type="submit"<?= $shift ? '' : ' disabled' ?>>Termina Servizio</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Schede e storico</h2>
+      <p class="sub">Le tue relazioni di soccorso e i turni svolti.</p>
+      <div class="tiles">
+        <a class="tile" href="scheda_nuova.php"><b>Compila scheda di soccorso</b><small>Relazione guidata a schermate</small></a>
+        <a class="tile" href="schede.php"><b>Le mie schede</b><small>Storico e PDF</small></a>
+        <a class="tile" href="shifts.php"><b>Storico shift</b><small>Ore e turni</small></a>
+        <?php if ($isCo): ?><a class="tile red" href="centralino.php"><b>Centrale Operativa</b><small>Chiamate e mezzi</small></a><?php endif; ?>
+      </div>
+    </section>
+  </div>
+
+  <?php if ($isAll || $isPers): ?>
+  <section class="card">
+    <h2>Coordinamento</h2>
+    <p class="sub">Strumenti per chi gestisce personale e mezzi.</p>
+    <div class="tiles">
+      <?php if ($isAll): ?><a class="tile" href="schede.php?scope=tutte"><b>Schede di tutti</b><small>Tutto il personale</small></a><?php endif; ?>
+      <?php if ($isPers): ?>
+        <a class="tile" href="shifts.php?scope=tutti"><b>Shift di tutti</b><small>Turni e ore</small></a>
+        <a class="tile" href="personale.php"><b>Gestione personale</b><small>Ruoli, matricole, credenziali</small></a>
+        <a class="tile" href="mezzi.php"><b>Gestione mezzi</b><small>Elenco mezzi e postazioni</small></a>
+      <?php endif; ?>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <div class="home-foot">
+    <a class="btn slate" href="password.php">Cambia password</a>
+    <form method="post" action="logout.php"><?= csrf_field() ?><button class="btn red" type="submit">Esci</button></form>
+  </div>
+</div>
 <?php page_foot();

@@ -17,6 +17,21 @@
  * 4) Intent del client: Guilds, GuildMembers, GuildMessages, MessageContent
  *    (GuildMembers va attivato anche nel Developer Portal -> Bot -> Server Members Intent).
  */
+// Se il tuo index.js non carica il file .env, lo legge il modulo (cerca .env accanto a questo file e nella cartella di avvio)
+(function loadEnv() {
+  if (process.env.ARES_SITE_URL && process.env.ARES_BOT_TOKEN && process.env.ARES_GUILD_ID) return;
+  const fs = require('fs'), path = require('path');
+  for (const dir of [__dirname, process.cwd()]) {
+    try {
+      const txt = fs.readFileSync(path.join(dir, '.env'), 'utf8');
+      for (const line of txt.split(/\r?\n/)) {
+        const m = line.match(/^\s*(ARES_[A-Z_]+)\s*=\s*(.*?)\s*$/);
+        if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+      }
+    } catch (e) { /* nessun .env qui */ }
+  }
+})();
+
 const SITE = (process.env.ARES_SITE_URL || '').replace(/\/$/, '');
 const TOKEN = process.env.ARES_BOT_TOKEN || '';
 const GUILD_ID = process.env.ARES_GUILD_ID || '';
@@ -71,9 +86,15 @@ function dmText(it) {
   );
 }
 
-/** Manda i DM; ritorna { sent: [ids], failed: [ids] } */
+function reason(e) {
+  if (e && e.code === 50007) return 'DM chiusi o bloccati';
+  if (e && /membro non trovato/.test(e.message)) return 'non è nel server';
+  return String((e && e.message) || e).slice(0, 60);
+}
+
+/** Manda i DM; ritorna { sent: [ids], failed: [ids], errors: {id: motivo} } */
 async function sendCredentials(guild, items) {
-  const sent = [], failed = [];
+  const sent = [], failed = [], errors = {};
   for (const it of items || []) {
     const member = await guild.members.fetch(it.discord_id).catch(() => null);
     try {
@@ -82,10 +103,12 @@ async function sendCredentials(guild, items) {
       sent.push(it.discord_id);
     } catch (e) {
       failed.push(it.discord_id);
+      errors[it.discord_id] = reason(e);
+      console.log('[ARES] DM non inviato a', it.username, '-', errors[it.discord_id]);
     }
     await new Promise(res => setTimeout(res, 1200));   // evita i limiti di velocita' di Discord
   }
-  return { sent, failed };
+  return { sent, failed, errors };
 }
 
 module.exports = function init(client) {
@@ -97,7 +120,7 @@ module.exports = function init(client) {
   async function sync(resetFor) {
     const guild = client.guilds.cache.get(GUILD_ID);
     if (!guild) throw new Error('Server non trovato: controlla ARES_GUILD_ID');
-    const members = await guild.members.fetch();
+    const members = await guild.members.fetch({ time: 60000 });
     const res = await callSite('bot_sync.php', buildPayload(members, resetFor));
     return { guild, res };
   }
@@ -108,20 +131,22 @@ module.exports = function init(client) {
   );
 
   let busy = false;
-  async function runJobs() {
-    if (busy) return;
+  async function runJobs(manual) {
+    if (busy) return 'occupato';
     busy = true;
     try {
       const p = await callSite('bot_jobs.php', { action: 'peek' });
-      if (!p.pending) return;
+      if (!p.pending) return 'nessun invio richiesto dal sito';
       const { guild } = await sync();                       // prima crea gli account di chi e' appena arrivato
       const job = await callSite('bot_jobs.php', { action: 'claim' });
-      if (!job.job_id) return;
+      if (!job.job_id) return 'nessun destinatario';
       const r = await sendCredentials(guild, job.items);
-      await callSite('bot_jobs.php', { action: 'report', job_id: job.job_id, sent: r.sent, failed: r.failed });
+      await callSite('bot_jobs.php', { action: 'report', job_id: job.job_id, sent: r.sent, failed: r.failed, errors: r.errors });
       console.log('[ARES] credenziali inviate:', r.sent.length, 'non consegnate:', r.failed.length);
+      return `inviati ${r.sent.length}, non consegnati ${r.failed.length}`;
     } catch (e) {
       console.log('[ARES] invio credenziali fallito:', e.message);
+      return 'errore: ' + e.message;
     } finally {
       busy = false;
     }
@@ -135,13 +160,26 @@ module.exports = function init(client) {
     setInterval(runSync, SYNC_EVERY_MIN * 60 * 1000);
     setInterval(runJobs, JOBS_EVERY_SEC * 1000);
   };
+  console.log('[ARES] Modulo attivo, sito:', SITE);
   client.once('clientReady', start);
   client.once('ready', start);
   if (client.isReady && client.isReady()) start();
 
   client.on('messageCreate', async msg => {
-    if (msg.author.bot || !msg.guild || !msg.content.startsWith('!resetpw')) return;
-    if (!msg.member.permissions.has('Administrator') || !msg.mentions.users.size) return;
+    if (msg.author.bot || !msg.guild || !msg.member || !msg.member.permissions.has('Administrator')) return;
+    // !ares-stato : controlla il collegamento con il sito
+    if (msg.content.startsWith('!ares-stato')) {
+      try { const p = await callSite('bot_jobs.php', { action: 'peek' }); await msg.reply(`Collegato al sito. Invii in attesa: ${p.pending ? 'sì' : 'no'}.`); }
+      catch (e) { await msg.reply('Non riesco a parlare col sito: ' + e.message); }
+      return;
+    }
+    // !ares-invia : esegue subito l'invio credenziali richiesto dal sito, senza aspettare il minuto
+    if (msg.content.startsWith('!ares-invia')) {
+      await msg.reply('Controllo le richieste del sito…');
+      await msg.reply('Esito: ' + await runJobs(true));
+      return;
+    }
+    if (!msg.content.startsWith('!resetpw') || !msg.mentions.users.size) return;
     try {
       const { guild, res } = await sync(new Set([msg.mentions.users.first().id]));
       const r = await sendCredentials(guild, (res.passwords || []).map(x => ({ ...x, nome: x.username })));

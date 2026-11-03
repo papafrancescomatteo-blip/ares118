@@ -6,7 +6,7 @@
  * Body JSON:
  *   {"action":"peek"}                                    -> {pending: true|false}
  *   {"action":"claim"}                                   -> {job_id, items:[{discord_id, nome, username, password}]}
- *   {"action":"report","job_id":"..","sent":[ids],"failed":[ids]}
+ *   {"action":"report","job_id":"..","sent":[ids],"failed":[ids],"errors":{id:motivo}}
  *
  * "claim" genera una nuova password temporanea per ogni destinatario: il bot la manda in DM e poi fa "report".
  */
@@ -73,9 +73,11 @@ try {
             $users->updateMany(['discord_id' => ['$in' => $sent]], ['$set' => ['cred_sent_at' => time()]]);
         }
         $dest = (array)($job['destinatari'] ?? []);
+        $why = (array)($body['errors'] ?? []);
         $failedNames = [];
         foreach ($failed as $did) {
-            $failedNames[] = (string)($dest[$did] ?? $did);
+            $reason = trim(mb_substr((string)($why[$did] ?? ''), 0, 80));
+            $failedNames[] = (string)($dest[$did] ?? $did) . ($reason !== '' ? ' (' . $reason . ')' : '');
         }
         $jobs->updateOne(id_filter($job['id']), ['$set' => [
             'stato' => 'completato', 'completato_at' => time(), 'inviati' => count($sent), 'falliti' => $failedNames,

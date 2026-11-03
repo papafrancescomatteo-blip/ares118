@@ -26,7 +26,7 @@ function hid(string $action, string $id): string
     return csrf_field() . '<input type="hidden" name="action" value="' . e($action) . '"><input type="hidden" name="id" value="' . e($id) . '"><input type="hidden" name="back" value="centralino.php">';
 }
 
-page_head('Centrale Operativa', 'wide');
+page_head('Centrale Operativa', 'wide', 'dark');
 ?>
 <div class="head">
   <?= brand_block() ?>

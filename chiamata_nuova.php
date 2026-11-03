@@ -61,7 +61,7 @@ function chk(array $old, string $k, string $v): string
     return in_array($v, array_map('strval', (array)($old[$k] ?? [])), true) ? ' checked' : '';
 }
 
-page_head('Nuova chiamata', 'wide');
+page_head('Nuova chiamata', 'wide', 'dark');
 ?>
 <div class="head">
   <?= brand_block() ?>

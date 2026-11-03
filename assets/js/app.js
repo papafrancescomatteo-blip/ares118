@@ -160,21 +160,42 @@
       return ctx.state === 'running' || ctx.state === 'suspended';
     }
     function running() { return ctx && ctx.state === 'running'; }
-    function tone(f, t0, dur) {
-      var o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'square'; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
-      g.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + t0 + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + dur);
-      o.connect(g); g.connect(ctx.destination);
-      o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + 0.02);
+    // nota "a campana": sinusoide + armonica, attacco morbido e coda lunga
+    function bell(f, t0, dur, vol) {
+      var t = ctx.currentTime + t0;
+      [[1, vol], [2.01, vol * 0.28], [3.02, vol * 0.1]].forEach(function (h) {
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = f * h[0];
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(h[1], t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(comp); o.start(t); o.stop(t + dur + 0.05);
+      });
     }
-    // segnale a due toni alternati (stile cercapersone / tablet di bordo), ripetuto tre volte
-    function pattern() {
+    var comp = null;
+    function speak(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      try {
+        speechSynthesis.cancel();
+        var u = new SpeechSynthesisUtterance(text);
+        u.lang = 'it-IT'; u.rate = 0.95; u.volume = 1;
+        var v = speechSynthesis.getVoices().filter(function (x) { return /^it/i.test(x.lang); })[0];
+        if (v) u.voice = v;
+        speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+    // segnale di chiamata: tre note ascendenti (do-mi-sol) + nota acuta, ripetuto; poi annuncio vocale
+    function pattern(withVoice) {
       if (!running() || !enabled()) return;
-      for (var i = 0; i < 3; i++) { tone(1320, i * 0.5, 0.22); tone(990, i * 0.5 + 0.25, 0.22); }
-      if (navigator.vibrate) navigator.vibrate([250, 120, 250]);
+      if (!comp) { comp = ctx.createDynamicsCompressor(); comp.connect(ctx.destination); }
+      var n = [523.25, 659.25, 783.99, 1046.5];
+      for (var r = 0; r < 2; r++) {
+        for (var i = 0; i < n.length; i++) bell(n[i], r * 1.25 + i * 0.16, i === 3 ? 0.9 : 0.5, 0.32);
+      }
+      if (navigator.vibrate) navigator.vibrate([300, 120, 300, 120, 500]);
+      if (withVoice) setTimeout(function () { speak(voiceText); }, 2700);
     }
+    var voiceText = '';
     function refreshAudioUi() {
       if (audioBtn) audioBtn.textContent = enabled() ? 'Audio attivo' : 'Audio spento';
       if (audioBar) audioBar.hidden = !(enabled() && AC && !running());
@@ -184,7 +205,7 @@
       if (blink) { clearInterval(blink); blink = null; document.title = baseTitle; }
     }
     function startAlarm() {
-      if (!timer) { pattern(); timer = setInterval(pattern, 3500); }
+      if (!timer) { pattern(true); var k = 0; timer = setInterval(function () { k++; pattern(k % 3 === 0); }, 6000); }
       if (!blink) { var on = false; blink = setInterval(function () { on = !on; document.title = on ? 'NUOVA CHIAMATA' : baseTitle; }, 800); }
     }
     window.aresScanCalls = function () {
@@ -193,6 +214,7 @@
         var id = el.getAttribute('data-alert-id');
         if (ack.indexOf(id) < 0) { pend.push(id); txt = txt || el.getAttribute('data-alert-text') || ''; }
       });
+      voiceText = pend.length ? 'Nuova chiamata. ' + txt : '';
       if (pend.length) {
         alertBar.hidden = false;
         document.getElementById('alert-text').textContent = txt ? ' · ' + txt : '';
@@ -212,7 +234,7 @@
     document.getElementById('audio-unlock').addEventListener('click', function () { unlock(); refreshAudioUi(); window.aresScanCalls(); });
     audioBtn.addEventListener('click', function () {
       if (enabled()) { store('ares_audio', 'off'); stopAlarm(); }
-      else { store('ares_audio', 'on'); unlock(); pattern(); }
+      else { store('ares_audio', 'on'); unlock(); pattern(false); }
       refreshAudioUi();
       window.aresScanCalls();
     });
@@ -221,6 +243,23 @@
       document.addEventListener(ev, function () { if (enabled() && !running()) { unlock(); setTimeout(function () { refreshAudioUi(); window.aresScanCalls(); }, 50); } }, { passive: true });
     });
     window.aresScanCalls();
+    // schermata "tocca per attivare": serve un tocco perche' il browser consenta il suono; chiede anche schermo intero e schermo sempre acceso
+    var gate = document.getElementById('sound-gate');
+    var gateOk = function () { try { return sessionStorage.getItem('ares_gate') === '1'; } catch (e) { return false; } };
+    function gateRefresh() { if (gate) gate.hidden = gateOk() || running() || !enabled() || !AC; }
+    var wl = null;
+    function keepAwake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }, function () {}); } catch (e) {} }
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') keepAwake(); });
+    if (gate) {
+      document.getElementById('gate-go').addEventListener('click', function () {
+        try { sessionStorage.setItem('ares_gate', '1'); } catch (e) {}
+        unlock(); keepAwake();
+        try { var de = document.documentElement; if (de.requestFullscreen && !document.fullscreenElement) de.requestFullscreen().catch(function () {}); } catch (e) {}
+        try { speechSynthesis.getVoices(); } catch (e) {}
+        setTimeout(function () { pattern(false); gateRefresh(); refreshAudioUi(); window.aresScanCalls(); }, 80);
+      });
+      gateRefresh();
+    }
   }
 
   // ---- Scheda di soccorso a schermate (se JavaScript manca, resta tutta in fila) ----

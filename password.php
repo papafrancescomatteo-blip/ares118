@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-page_head('Cambia password');
+page_head('Cambia password', 'narrow', 'dark');
 ?>
 <h1>Cambia password</h1>
 <p class="sub"><?= $forced ? 'Prima di continuare scegli una password personale.' : 'Aggiorna la tua password di accesso.' ?></p>

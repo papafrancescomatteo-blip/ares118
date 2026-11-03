@@ -8,6 +8,16 @@ function bot_out(array $d, int $code = 200): void
     exit;
 }
 
+/** Annota quando il bot si e' fatto vivo (o ha sbagliato token): lo mostra la pagina Gestione personale */
+function bot_heartbeat(string $field): void
+{
+    try {
+        col('settings')->findOneAndUpdate(['_id' => 'bot'], ['$set' => [$field => time()]], ['upsert' => true]);
+    } catch (Throwable $e) {
+        error_log('bot_heartbeat: ' . $e->getMessage());
+    }
+}
+
 /** Controlla metodo POST e token del bot; ritorna il corpo JSON gia' decodificato */
 function bot_require_auth(): array
 {
@@ -31,8 +41,10 @@ function bot_require_auth(): array
     }
     if (!hash_equals(BOT_TOKEN, $token)) {
         usleep(300000);
+        bot_heartbeat('unauth_at');
         bot_out(['ok' => false, 'error' => 'Non autorizzato'], 401);
     }
+    bot_heartbeat('seen_at');
     $raw = defined('BOT_TEST_INPUT') ? BOT_TEST_INPUT : (string)file_get_contents('php://input');
     $body = json_decode($raw, true);
     return is_array($body) ? $body : [];
