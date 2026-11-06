@@ -132,6 +132,8 @@ $pend = (!empty($user['ruolo_richiesto']) && isset(ROLES[$user['ruolo_richiesto'
       <span>Matricola <?= !empty($user['matricola']) ? e($user['matricola']) : 'non assegnata' ?></span>
       <span><?= !empty($user['grado']) ? e($user['grado']) : 'Grado non assegnato' ?></span>
       <?php if (!empty($user['co'])): ?><span>Abilitato Centrale Operativa</span><?php endif; ?>
+      <?php if (!empty($user['avvertimenti'])): ?><span class="pend">Avvertimenti: <?= (int)$user['avvertimenti'] ?></span><?php endif; ?>
+      <?php if (!empty($user['note_merito'])): ?><span>Note di merito: <?= (int)$user['note_merito'] ?></span><?php endif; ?>
       <?php if ($pend): ?><span class="pend">Ruolo richiesto: <?= e($pend) ?> · in attesa di conferma</span><?php endif; ?>
     </div>
   </section>

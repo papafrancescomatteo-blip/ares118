@@ -6,8 +6,7 @@ $me = require_login();
 require_perm('personale', $me);
 
 $assignable = assignable_roles($me);
-$all = array_values(array_filter(find_all('users', []), static fn($u) => manageable($me, $u)));
-usort($all, static fn($a, $b) => strcasecmp(full_name($a), full_name($b)));
+$all = array_values(array_filter(sort_by_grade(find_all('users', ['licenziato' => null])), static fn($u) => manageable($me, $u)));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();

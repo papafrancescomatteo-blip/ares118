@@ -25,9 +25,10 @@ function page_head(string $title, string $width = 'narrow', string $theme = ''):
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/style.css?v=5">
+<link rel="stylesheet" href="assets/css/style.css?v=6">
 </head>
 <body class="<?= e($theme) ?>">
+<?php if (($cu0 = current_user()) && ($av0 = avviso_da_leggere($cu0['id']))) { render_avviso($av0); } ?>
 <header class="topbar"><div class="topbar-in">
   <img src="<?= e(logo_url()) ?>" alt="">
   <div class="wm"><b>ARES 118 Lazio</b><span>Unità di Emergenza · Dashboard operativa</span></div>
@@ -42,7 +43,7 @@ function page_head(string $title, string $width = 'narrow', string $theme = ''):
 <?php endif;
 }
 
-function page_foot(array $scripts = ['assets/js/app.js?v=3']): void
+function page_foot(array $scripts = ['assets/js/app.js?v=4']): void
 {
     ?>
 </div>

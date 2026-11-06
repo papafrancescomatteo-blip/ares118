@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'pz_indirizzo'         => in_str($p, 'pz_indirizzo', 150),
         'patologia'            => in_str($p, 'patologia', 120),
         'dinamica'             => in_str($p, 'dinamica', 120),
-        'codice_patologia'     => in_str($p, 'codice_patologia', 120),
+        'codice_patologia'     => in_pick($p, 'codice_patologia', CODICI_PATOLOGIA),
         'posizione'            => in_pick($p, 'posizione', array_keys(POSIZIONI)),
         'respiro'              => in_str($p, 'respiro', 60),
         'polso'                => in_str($p, 'polso', 40),
@@ -250,9 +250,9 @@ page_head('Scheda di Soccorso', 'wide');
 
 <div class="sec"><h2>4. Evento</h2>
   <div class="cells" style="--cols:3">
-    <div class="cell"><label class="lbl" for="patologia">Patologia riscontrata all'arrivo</label><?= combo('patologia', 'Scrivi per filtrare (es: cardio…)', PATOLOGIE, (string)($old['patologia'] ?? '')) ?></div>
-    <div class="cell"><label class="lbl" for="dinamica">Dinamica riscontrata</label><?= combo('dinamica', 'Scrivi per filtrare (es: incidente…)', DINAMICHE, (string)($old['dinamica'] ?? '')) ?></div>
-    <div class="cell"><label class="lbl" for="codice_patologia">Codice patologia riscontrata</label><?= combo('codice_patologia', 'Scrivi per filtrare (es: trauma, STEMI…)', CODICI_PATOLOGIA, (string)($old['codice_patologia'] ?? '')) ?></div>
+    <div class="cell"><label class="lbl" for="patologia">Patologia riscontrata all'arrivo</label><input type="text" name="patologia" id="patologia" maxlength="120" autocomplete="off" value="<?= e((string)($old['patologia'] ?? '')) ?>"></div>
+    <div class="cell"><label class="lbl" for="dinamica">Dinamica riscontrata</label><input type="text" name="dinamica" id="dinamica" maxlength="120" autocomplete="off" value="<?= e((string)($old['dinamica'] ?? '')) ?>"></div>
+    <div class="cell"><label class="lbl" for="codice_patologia">Codice patologia riscontrata</label><select name="codice_patologia" id="codice_patologia"><option value="">–</option><?php foreach (CODICI_PATOLOGIA as $cp): ?><option value="<?= e($cp) ?>"<?= (($old['codice_patologia'] ?? '') === $cp) ? ' selected' : '' ?>><?= e($cp) ?></option><?php endforeach; ?></select></div>
     <div class="cell full"><span class="lbl">Posizione paziente all'arrivo</span><?= radio_group('posizione', POSIZIONI, $old['posizione'] ?? null) ?></div>
   </div>
 </div>

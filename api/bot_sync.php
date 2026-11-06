@@ -72,13 +72,19 @@ try {
         }
         $seen[] = $did;
         [$role, $isCo] = map_roles((array)($u['roles'] ?? []));
-        $nome = trim(mb_substr((string)($u['nome'] ?? ''), 0, 60));
-        $cognome = trim(mb_substr((string)($u['cognome'] ?? ''), 0, 60));
+        [$nome, $cognome, $matrNick] = clean_person_name((string)($u['nome'] ?? ''), (string)($u['cognome'] ?? ''));
         $matr = isset($u['matricola']) ? trim(mb_substr((string)$u['matricola'], 0, 20)) : '';
+        if ($matr === '' && $matrNick !== null) {
+            $matr = $matrNick;
+        }
         $grado = isset($u['grado']) ? trim(mb_substr((string)$u['grado'], 0, 80)) : '';
         $reset = !empty($u['reset_password']);
 
         $ex = find_one_by('users', ['discord_id' => $did]);
+
+        if ($ex && !empty($ex['licenziato'])) {
+            continue;   // licenziato: non si riattiva da solo, solo con "Riassumi" sul sito
+        }
 
         if ($ex) {
             if (empty($ex['locked'])) {

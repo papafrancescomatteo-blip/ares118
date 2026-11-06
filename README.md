@@ -111,6 +111,20 @@ il bot non le sovrascrive finché non premi "Affida al bot".
 - All'avvio del servizio con un mezzo si apre il **tablet di bordo**: solo chiamate in arrivo, schede da compilare, equipaggio e i due pulsanti *Metti in pausa* / *Termina servizio*. Suono a campana (tre note + nota acuta), annuncio vocale in italiano, vibrazione, schermo sempre acceso; alla prima apertura serve un tocco su "Attiva audio e continua" (regola dei browser).
 - Il PDF della scheda è una pagina unica nel modulo "Relazione di soccorso" (intestazioni blu/rosse, etichette azzurre, caselle bianche). Si genera nel browser (html2pdf da cdnjs): serve internet sul dispositivo.
 
+## 3f. Gestioni, avvisi e shift
+
+- **Gestione personale** ora è ordinata dal grado più alto al più basso (poi ruolo e nome).
+- **Username** = solo nome e cognome (il soprannome Discord "Nome Cognome | AS-05" viene ripulito dal bot e dal sito; i vecchi account si sistemano da soli alla prima apertura di Gestione personale, e il vecchio username continua a funzionare per entrare).
+- **Gestione settimanale** (pulsante rosso in Gestione personale): per ogni persona esito (nessun provvedimento / promozione / degrado / licenziamento), nuovo grado, avvertimento, nota di merito. Si può salvare come bozza; "Pubblica" è attivo solo quando tutte le persone sono state gestite. Alla pubblicazione: provvedimenti applicati, **tutti gli shift azzerati** (anche quelli attivi: chiusi e archiviati), schermata con OK a tutti (chi non è sul sito la vede alla prima apertura), messaggio automatico del bot nel canale.
+- **Gestione singola** (pulsante "Gestisci" su ogni riga): avvertimento, nota di merito, promozione, degrado o licenziamento immediati, con schermata alla persona e messaggio del bot.
+- **Licenziamento**: credenziali eliminate subito; nella schermata di login compare "Sei stato licenziato per il seguente motivo: …" finché la persona non preme OK. Resta nell'elenco "Licenziati" con il pulsante Riassumi.
+- **Canale del bot**: il bot cerca un canale testuale il cui nome contiene "gestioni". Se il nome è diverso, metti nel `.env` del bot `ARES_CANALE_GESTIONI=<ID del canale>`. L'esito si vede nella pagina Gestione settimanale. Serve aggiornare `ares_sync.js` sul bot.
+- **Shift degli altri** (Storico shift · tutto il personale): aggiungi o togli minuti a uno shift, eliminalo, o aggiungi uno shift a mano.
+
+## 3g. Ruoli Discord (aggiornati il 6 novembre)
+
+Direttore Generale ARES 118 → **Direttore** (amministratore del sito); Direttore Sanitario e Direttore Amministrativo → Vice Direttore; le cinque U.O.C., Ispettore Operativo e Capo Turno → Coordinatore; Medico e Infermiere Emergenza Urgenza 118 → Medico / Infermiere; Soccorritore Avanzato, Esperto e 118 → Soccorritore; Soccorritore in Formazione e Aspirante Soccorritore → Recluta. Gli ID sono in `config.php` (`ROLE_MAP`). I gradi hanno gli stessi nomi dei ruoli e i vecchi (Dirigente, Referente…) si aggiornano da soli.
+
 ## 4. Personalizzare
 
 * **Logo**: metti `logo.png` (o `.jpg`/`.webp`/`.svg`) in `assets/img/`. Se c'è, sostituisce quello di esempio.

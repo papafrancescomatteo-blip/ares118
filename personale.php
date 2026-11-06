@@ -96,6 +96,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $users->updateOne(id_filter($t['id']), ['$set' => ['ruolo_richiesto' => null, 'ruolo_rifiutato' => $req]]);
             flash('Richiesta di <b>' . e(ROLES[$req]['label']) . '</b> per ' . e(full_name($t)) . ' rifiutata: resta ' . e(role_info($t['ruolo'])['label']) . '.');
         }
+    } elseif ($action === 'riassumi') {
+        if (empty($t['licenziato'])) {
+            flash('Questa persona non risulta licenziata.', 'err');
+        } else {
+            $users->updateOne(id_filter($t['id']), ['$set' => ['licenziato' => null, 'attivo' => true, 'must_change_pw' => true, 'cred_sent_at' => null, 'password_hash' => password_hash(random_password(), PASSWORD_DEFAULT)]]);
+            flash('<b>' . e(full_name($t)) . '</b> è stato riassunto: usa "Invia DM" per mandargli le nuove credenziali.');
+        }
     } elseif ($action === 'unlock') {
         $users->updateOne(id_filter($t['id']), ['$set' => ['locked' => false]]);
         flash('<b>' . e(full_name($t)) . '</b> torna sotto la gestione del bot.');
@@ -109,7 +116,13 @@ if ($q !== '') {
     $re = new MongoDB\BSON\Regex(preg_quote($q, '/'), 'i');
     $f['$or'] = [['username' => $re], ['matricola' => $re], ['grado' => $re], ['discord_id' => $re]];
 }
-$list = find_all('users', $f, ['sort' => ['attivo' => -1, 'nome' => 1, 'cognome' => 1], 'collation' => ['locale' => 'it', 'strength' => 2]]);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    fix_gradi_rinominati();
+    fix_legacy_usernames();   // username = solo nome e cognome (toglie "| AS-05" dai vecchi account)
+}
+$f['licenziato'] = null;
+$list = sort_by_grade(find_all('users', $f));
+$licenziati = find_all('users', ['licenziato' => ['$ne' => null]]);   // dal grado piu' alto al piu' basso
 
 // numero di schede per persona (una sola query)
 $counts = [];
@@ -142,7 +155,7 @@ page_head('Gestione personale', 'wide');
   <h2>Ruoli da confermare (<?= count($richieste) ?>)</h2>
   <p class="locknote">Discord assegna a queste persone un ruolo con poteri di gestione. Finché non lo confermi hanno il ruolo attuale.</p>
   <div class="tbl-wrap"><table class="tbl">
-    <tr><th><input type="checkbox" id="sel-all" title="Seleziona tutti" aria-label="Seleziona tutti"></th><th>Persona</th><th>Ruolo attuale</th><th>Ruolo richiesto da Discord</th><th>Azioni</th></tr>
+    <tr><th>Persona</th><th>Ruolo attuale</th><th>Ruolo richiesto da Discord</th><th>Azioni</th></tr>
     <?php foreach ($richieste as $u): $fid = 'r' . $u['id']; ?>
     <tr>
       <td><b><?= e(full_name($u)) ?></b><br><small style="color:#6b7a90"><?= e($u['grado'] ?? '') ?: e($u['username']) ?></small></td>
@@ -188,6 +201,7 @@ page_head('Gestione personale', 'wide');
   <button class="btn teal small" type="submit">Cerca</button>
   <a class="btn slate small" href="mezzi.php">Gestione mezzi</a>
   <a class="btn blue small" href="personale_massa.php">Modifica tutti</a>
+  <a class="btn red small" href="gestioni.php">Gestione settimanale</a>
 </form>
 
 <form id="selform" method="post" class="tools" style="margin:0 0 10px;align-items:center"><?= csrf_field() ?>
@@ -196,7 +210,7 @@ page_head('Gestione personale', 'wide');
 </form>
 <div class="tbl-wrap">
 <table class="tbl">
-  <tr><th>Persona</th><th>Matricola</th><th>Grado</th><th>Ruolo</th><th>Stato</th><th>Schede</th><th>Ultimo accesso</th><th>Azioni</th></tr>
+  <tr><th><input type="checkbox" id="sel-all" title="Seleziona tutti" aria-label="Seleziona tutti"></th><th>Persona</th><th>Matricola</th><th>Grado</th><th>Ruolo</th><th>Stato</th><th>Schede</th><th>Ultimo accesso</th><th>Azioni</th></tr>
   <?php foreach ($list as $u): $ok = manageable($me, $u); $n = $counts[$u['id']] ?? 0; $fid = 'f' . $u['id']; ?>
   <tr>
     <td><?php if ($ok && !empty($u['discord_id']) && !empty($u['attivo'])): ?><input type="checkbox" form="selform" name="sel[]" value="<?= e($u['id']) ?>" class="sel-one" aria-label="Seleziona <?= e(full_name($u)) ?>"><?php endif; ?></td>
@@ -215,6 +229,7 @@ page_head('Gestione personale', 'wide');
       <form id="<?= e($fid) ?>" method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($u['id']) ?>"></form>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <a class="btn teal small" href="persona_modifica.php?id=<?= e($u['id']) ?>">Modifica</a>
+        <a class="btn orange small" href="gestione_singola.php?id=<?= e($u['id']) ?>" title="Avvertimento, nota di merito, promozione, degrado, licenziamento">Gestisci</a>
         <?php if (!empty($u['discord_id'])): ?><button form="<?= e($fid) ?>" class="btn blue small" name="action" value="cred_uno" title="Il bot invia le credenziali in DM"><?= !empty($u['cred_sent_at']) ? 'Reinvia DM' : 'Invia DM' ?></button><?php endif; ?>
         <button form="<?= e($fid) ?>" class="btn orange small" name="action" value="reset" onclick="return confirm('Generare una nuova password per questa persona?')">Reset pw</button>
         <button form="<?= e($fid) ?>" class="btn <?= !empty($u['attivo']) ? 'red' : 'blue' ?> small" name="action" value="toggle"><?= !empty($u['attivo']) ? 'Disattiva' : 'Riattiva' ?></button>
@@ -224,9 +239,22 @@ page_head('Gestione personale', 'wide');
     </td>
   </tr>
   <?php endforeach; ?>
-  <?php if (!$list): ?><tr><td class="empty" colspan="8">Nessuna persona trovata.</td></tr><?php endif; ?>
+  <?php if (!$list): ?><tr><td class="empty" colspan="9">Nessuna persona trovata.</td></tr><?php endif; ?>
 </table>
 </div>
+
+<?php $licenziati = array_values(array_filter($licenziati, static fn($u) => !empty($u['licenziato']) && manageable($me, $u))); if ($licenziati): ?>
+<div class="sec">
+  <h2>Licenziati (<?= count($licenziati) ?>)</h2>
+  <div class="tbl-wrap"><table class="tbl">
+    <tr><th>Persona</th><th>Motivo</th><th>Data</th><th>Da</th><th></th></tr>
+    <?php foreach ($licenziati as $u): ?>
+    <tr><td><b><?= e(full_name($u)) ?></b></td><td><?= e($u['licenziato']['motivo']) ?></td><td><?= e(date('d/m/Y', (int)$u['licenziato']['at'])) ?></td><td><?= e($u['licenziato']['da']) ?></td>
+      <td><form method="post"><?= csrf_field() ?><input type="hidden" name="id" value="<?= e($u['id']) ?>"><button class="btn slate small" name="action" value="riassumi" onclick="return confirm('Riassumere questa persona? Dovrai inviarle di nuovo le credenziali.')">Riassumi</button></form></td></tr>
+    <?php endforeach; ?>
+  </table></div>
+</div>
+<?php endif; ?>
 
 <div class="sec add-user">
   <h2>Aggiungi persona a mano</h2>

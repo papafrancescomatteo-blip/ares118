@@ -39,7 +39,10 @@ const SYNC_EVERY_MIN = 30;
 const JOBS_EVERY_SEC = 60;
 
 function splitName(member) {
-  const full = (member.nickname || member.displayName || member.user.username).trim();
+  // "Matteo Filippi | AS-05" -> username solo "Matteo Filippi" (il sito toglie comunque matricola e simboli)
+  const raw = (member.nickname || member.displayName || member.user.username).trim();
+  const parts = raw.split(/\s*[|\/]\s*/).map(x => x.trim()).filter(Boolean);
+  const full = parts.find(x => !/^[A-Za-z]{1,4}[-. ]?\d{1,5}$/.test(x)) || raw;
   const i = full.indexOf(' ');
   return i < 0 ? [full, ''] : [full.slice(0, i), full.slice(i + 1)];
 }
@@ -152,6 +155,46 @@ module.exports = function init(client) {
     }
   }
 
+  // messaggi del sito nel canale (es. #gestioni): il canale si trova per ID (ARES_CANALE_GESTIONI) oppure per nome
+  function findChannel(guild, nome) {
+    const id = process.env.ARES_CANALE_GESTIONI;
+    if (nome === 'gestioni' && id && guild.channels.cache.get(id)) return guild.channels.cache.get(id);
+    return guild.channels.cache.find(c => c.isTextBased() && !c.isThread() && c.name && c.name.toLowerCase().includes(nome));
+  }
+
+  let busyMsg = false;
+  async function runMessages() {
+    if (busyMsg) return 'occupato';
+    busyMsg = true;
+    try {
+      const p = await callSite('bot_jobs.php', { action: 'peek' });
+      if (!p.pending_msg) return 'nessun messaggio da inviare';
+      const guild = client.guilds.cache.get(GUILD_ID);
+      const job = await callSite('bot_jobs.php', { action: 'claim_msg' });
+      if (!job.job_id) return 'nessun messaggio';
+      const ch = guild && findChannel(guild, job.canale || 'gestioni');
+      if (!ch) {
+        await callSite('bot_jobs.php', { action: 'report_msg', job_id: job.job_id, sent: false, error: 'canale #' + (job.canale || 'gestioni') + ' non trovato (imposta ARES_CANALE_GESTIONI)' });
+        return 'canale non trovato';
+      }
+      try {
+        for (const text of job.messaggi) await ch.send({ content: text, allowedMentions: { parse: [] } });
+        await callSite('bot_jobs.php', { action: 'report_msg', job_id: job.job_id, sent: true });
+        console.log('[ARES] messaggio inviato in #' + ch.name);
+        return 'inviato in #' + ch.name;
+      } catch (e) {
+        await callSite('bot_jobs.php', { action: 'report_msg', job_id: job.job_id, sent: false, error: reason(e) });
+        console.log('[ARES] messaggio non inviato:', e.message);
+        return 'errore: ' + e.message;
+      }
+    } catch (e) {
+      console.log('[ARES] messaggi dal sito falliti:', e.message);
+      return 'errore: ' + e.message;
+    } finally {
+      busyMsg = false;
+    }
+  }
+
   // parte una sola volta, con qualunque versione di discord.js ('ready' nelle vecchie, 'clientReady' nelle nuove)
   const start = () => {
     if (client.__aresStarted) return;
@@ -159,6 +202,7 @@ module.exports = function init(client) {
     runSync();
     setInterval(runSync, SYNC_EVERY_MIN * 60 * 1000);
     setInterval(runJobs, JOBS_EVERY_SEC * 1000);
+    setInterval(runMessages, 20 * 1000);
   };
   console.log('[ARES] Modulo attivo, sito:', SITE);
   client.once('clientReady', start);
@@ -177,6 +221,7 @@ module.exports = function init(client) {
     if (msg.content.startsWith('!ares-invia')) {
       await msg.reply('Controllo le richieste del sito…');
       await msg.reply('Esito: ' + await runJobs(true));
+      await msg.reply('Messaggi nel canale: ' + await runMessages());
       return;
     }
     if (!msg.content.startsWith('!resetpw') || !msg.mentions.users.size) return;

@@ -5,6 +5,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/options.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/ops.php';
+require_once __DIR__ . '/gestioni.php';
 
 date_default_timezone_set('Europe/Rome');
 
@@ -100,6 +101,10 @@ function current_user(): ?array
         return null;
     }
     $u = find_one_by('users', id_filter($_SESSION['uid']));
+    if ($u && !empty($u['licenziato']) && empty($u['licenziato']['ack'])) {
+        $_SESSION = ['fired_uid' => $u['id']];   // la schermata di login mostrera' il motivo finche' non preme OK
+        return null;
+    }
     if (!$u || empty($u['attivo'])) {
         $_SESSION = [];
         return null;
@@ -170,12 +175,17 @@ function fmt_time(?string $t): string
 
 function code_badge(?string $c): string
 {
-    if (!$c || !isset(CODICI_RIENTRO[$c])) {
+    if (!$c) {
         return '';
     }
-    $col = CODICI_COLORI[$c];
-    $txt = in_array($c, ['bianco', 'giallo'], true) ? '#111' : '#fff';
-    return '<span class="badge" style="background:' . $col . ';color:' . $txt . '">' . e(CODICI_RIENTRO[$c]) . '</span>';
+    if (isset(CODICI_COLORI[$c])) {   // schede vecchie con codice a colore
+        $txt = in_array($c, ['bianco', 'giallo'], true) ? '#111' : '#fff';
+        return '<span class="badge" style="background:' . CODICI_COLORI[$c] . ';color:' . $txt . '">' . e(ucfirst($c)) . '</span>';
+    }
+    if (!isset(CODICI_RIENTRO[$c])) {
+        return '';
+    }
+    return '<span class="badge" style="background:#0b2a4a;color:#fff">' . e(CODICI_RIENTRO[$c]) . '</span>';
 }
 
 // ---------- Validazione input della scheda ----------
@@ -237,7 +247,7 @@ function shift_net_seconds(array $s): int
     if ($s['pause_started'] && !$s['end_at']) {
         $pause += time() - (int)$s['pause_started'];
     }
-    return max(0, (int)$end - (int)$s['start_at'] - $pause);
+    return max(0, (int)$end - (int)$s['start_at'] - $pause + (int)($s['adjust_seconds'] ?? 0));
 }
 
 function fmt_duration(int $sec): string
@@ -282,6 +292,29 @@ function assignable_roles(array $me): array
 {
     $lvl = role_info($me['ruolo'])['level'];
     return array_filter(ROLES, static fn($r) => $r['level'] <= $lvl);
+}
+
+/** Posizione del grado (0 = piu' alto). Chi non ha un grado noto va in fondo. */
+function grade_rank(array $u): int
+{
+    $i = array_search((string)($u['grado'] ?? ''), GRADI, true);
+    return $i === false ? 999 : (int)$i;
+}
+
+/** Ordina dal grado piu' alto al piu' basso; a parita' livello del ruolo e poi cognome/nome. */
+function sort_by_grade(array $list): array
+{
+    usort($list, static function ($a, $b) {
+        $aa = !empty($a['attivo']);
+        $bb = !empty($b['attivo']);
+        if ($aa !== $bb) {
+            return $bb <=> $aa;
+        }
+        return grade_rank($a) <=> grade_rank($b)
+            ?: role_info($b['ruolo'] ?? '')['level'] <=> role_info($a['ruolo'] ?? '')['level']
+            ?: strcasecmp(full_name($a), full_name($b));
+    });
+    return $list;
 }
 
 function gradi_datalist(): string

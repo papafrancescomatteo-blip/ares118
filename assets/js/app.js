@@ -103,6 +103,7 @@
   // ---- Evita doppio invio ----
   document.querySelectorAll('form[data-once]').forEach(function (f) {
     f.addEventListener('submit', function (ev) {
+      if (ev.defaultPrevented) return;   // annullato da un altro controllo (es. conferma)
       if (f.dataset.sent) { ev.preventDefault(); return; }
       f.dataset.sent = '1';
       setTimeout(function () { f.querySelectorAll('button[type=submit]').forEach(function (b) { b.disabled = true; }); }, 0);

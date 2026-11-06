@@ -19,6 +19,7 @@ Dipendenza: requests   (pip install requests)
 """
 import asyncio
 import os
+import re
 import time
 
 import discord
@@ -47,7 +48,10 @@ GUILD_ID = int(os.environ.get("ARES_GUILD_ID", "0") or 0)
 
 
 def split_name(m: discord.Member):
-    full = (m.nick or m.display_name or m.name).strip()
+    # "Matteo Filippi | AS-05" -> username solo "Matteo Filippi" (il sito toglie comunque matricola e simboli)
+    raw = (m.nick or m.display_name or m.name).strip()
+    parts = [x.strip() for x in re.split(r"\s*[|/]\s*", raw) if x.strip()]
+    full = next((x for x in parts if not re.fullmatch(r"[A-Za-z]{1,4}[-. ]?\d{1,5}", x)), raw)
     p = full.split(" ", 1)
     return p[0], (p[1] if len(p) > 1 else "")
 
@@ -95,10 +99,13 @@ class AresSync(commands.Cog):
         self.busy = False
         self.loop_sync.start()
         self.loop_jobs.start()
+        self.loop_msg.start()
+        self.busy_msg = False
 
     def cog_unload(self):
         self.loop_sync.cancel()
         self.loop_jobs.cancel()
+        self.loop_msg.cancel()
 
     async def sync(self, reset_for=()):
         guild = self.bot.get_guild(GUILD_ID)
@@ -167,8 +174,53 @@ class AresSync(commands.Cog):
     async def loop_jobs(self):
         await self.run_jobs()
 
+    def find_channel(self, guild, nome):
+        cid = os.environ.get("ARES_CANALE_GESTIONI", "")
+        if nome == "gestioni" and cid.isdigit() and guild.get_channel(int(cid)):
+            return guild.get_channel(int(cid))
+        return next((c for c in guild.text_channels if nome in c.name.lower()), None)
+
+    async def run_messages(self):
+        """Scrive nel canale (es. #gestioni) i messaggi richiesti dal sito."""
+        if self.busy_msg:
+            return "occupato"
+        self.busy_msg = True
+        try:
+            pend = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "peek"})
+            if not pend.get("pending_msg"):
+                return "nessun messaggio da inviare"
+            guild = self.bot.get_guild(GUILD_ID)
+            job = await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "claim_msg"})
+            if not job.get("job_id"):
+                return "nessun messaggio"
+            ch = self.find_channel(guild, job.get("canale") or "gestioni") if guild else None
+            if not ch:
+                await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "report_msg", "job_id": job["job_id"], "sent": False,
+                                                                     "error": "canale non trovato (imposta ARES_CANALE_GESTIONI)"})
+                return "canale non trovato"
+            try:
+                for text in job.get("messaggi", []):
+                    await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
+                await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "report_msg", "job_id": job["job_id"], "sent": True})
+                print("[ARES] messaggio inviato in #" + ch.name)
+                return "inviato in #" + ch.name
+            except Exception as ex:
+                await asyncio.to_thread(call_site, "bot_jobs.php", {"action": "report_msg", "job_id": job["job_id"], "sent": False,
+                                                                     "error": self.reason(ex)})
+                return f"errore: {ex}"
+        except Exception as ex:
+            print("[ARES] messaggi dal sito falliti:", ex)
+            return f"errore: {ex}"
+        finally:
+            self.busy_msg = False
+
+    @tasks.loop(seconds=20)
+    async def loop_msg(self):
+        await self.run_messages()
+
     @loop_sync.before_loop
     @loop_jobs.before_loop
+    @loop_msg.before_loop
     async def _wait(self):
         await self.bot.wait_until_ready()
 
@@ -186,6 +238,7 @@ class AresSync(commands.Cog):
         if msg.content.startswith("!ares-invia"):  # esegue subito l'invio richiesto dal sito
             await msg.reply("Controllo le richieste del sito…", mention_author=False)
             await msg.reply("Esito: " + await self.run_jobs(), mention_author=False)
+            await msg.reply("Messaggi nel canale: " + await self.run_messages(), mention_author=False)
             return
         if not msg.content.startswith("!resetpw") or not msg.mentions:
             return

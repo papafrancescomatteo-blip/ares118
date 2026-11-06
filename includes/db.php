@@ -80,6 +80,61 @@ function free_username(string $base): string
     return $name;
 }
 
+/**
+ * Pulisce un soprannome Discord tipo "Matteo Filippi | AS-05": l'username e' solo nome e cognome.
+ * Ritorna [nome, cognome, matricola|null].
+ */
+function clean_person_name(string $nome, string $cognome = ''): array
+{
+    $full = trim($nome . ' ' . $cognome);
+    $name = '';
+    $matr = null;
+    foreach (preg_split('/\s*[|\/]\s*/u', $full) as $part) {
+        $part = trim($part);
+        if ($part === '') {
+            continue;
+        }
+        if (preg_match('/^[A-Za-z]{1,4}[-. ]?\d{1,5}$/', $part)) {
+            $matr = $matr ?? strtoupper(str_replace(' ', '-', $part));
+        } elseif ($name === '') {
+            $name = $part;
+        }
+    }
+    $name = trim(preg_replace('/\s+/u', ' ', $name));
+    $pos = mb_strpos($name, ' ');
+    return $pos === false ? [mb_substr($name, 0, 60), '', $matr] : [mb_substr($name, 0, $pos), mb_substr($name, $pos + 1, 60), $matr];
+}
+
+/** Porta i vecchi nomi dei gradi (es. "Referente Medici") ai nuovi nomi dei ruoli Discord. */
+function fix_gradi_rinominati(): void
+{
+    foreach (GRADI_RINOMINATI as $old => $new) {
+        col('users')->updateMany(['grado' => $old], ['$set' => ['grado' => $new]]);
+    }
+}
+
+/** Account creati con soprannomi sporchi ("Nome Cognome | AS-05"): li porta a username = nome cognome. */
+function fix_legacy_usernames(): int
+{
+    $n = 0;
+    foreach (find_all('users', ['$or' => [['username' => new MongoDB\BSON\Regex('[|]')], ['cognome' => new MongoDB\BSON\Regex('[|]')], ['nome' => new MongoDB\BSON\Regex('[|]')]]]) as $u) {
+        [$nome, $cognome, $matr] = clean_person_name((string)($u['nome'] ?? ''), (string)($u['cognome'] ?? ''));
+        if ($nome === '') {
+            continue;
+        }
+        $new = free_username(trim($nome . ' ' . $cognome));
+        $set = ['nome' => $nome, 'cognome' => $cognome, 'username' => $new, 'username_lc' => mb_strtolower($new)];
+        if ($matr !== null && trim((string)($u['matricola'] ?? '')) === '') {
+            $set['matricola'] = $matr;
+        }
+        $old = array_values(array_unique(array_merge((array)($u['old_login_lc'] ?? []), [mb_strtolower((string)$u['username'])])));
+        $set['old_login_lc'] = $old;
+        col('users')->updateOne(id_filter($u['id']), ['$set' => $set]);
+        $n++;
+    }
+    return $n;
+}
+
 /** Crea un utente. Ritorna ['id' => ..., 'username' => ...] */
 function create_user(string $nome, string $cognome, string $ruolo, ?string $matricola, ?string $discordId, string $password, bool $locked = false, ?string $grado = null, bool $co = false): array
 {

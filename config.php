@@ -30,31 +30,31 @@ define('BOT_TOKEN', env_or('BOT_TOKEN', 'CAMBIA_CON_UNA_CHIAVE_LUNGA_E_CASUALE')
 // Valore 'co' = non e' un ruolo principale ma abilita la Centrale Operativa (centralino).
 // PROPOSTA da confermare: i ruoli dirigenziali/di coordinamento gestiscono il personale, gli altri no.
 const ROLE_MAP = [
-    // Dirigenza ARES 118
-    '1494395260317597786' => 'direttore',        // Dirigente ARES 118
-    '1494395387828633620' => 'vice_direttore',   // Vice Dirigente ARES 118
-    // Coordinamento ARES 118
-    '1565785287693566033' => 'coordinatore',     // Referente Medici
-    '1565785398913933433' => 'coordinatore',     // Referente Infermieri
-    '1494395589616468058' => 'coordinatore',     // Referente Operatori
-    '1494395703563386989' => 'coordinatore',     // Referente Emergenze
-    '1494382277118005249' => 'coordinatore',     // Referente Formazione
-    '1494382276082143394' => 'coordinatore',     // Referente Materiali
+    // Direzione ARES 118
+    '1494395260317597786' => 'direttore',        // Direttore Generale ARES 118
+    '1494395387828633620' => 'vice_direttore',   // Direttore Sanitario ARES 118
+    '1567274733517537380' => 'vice_direttore',   // Direttore Amministrativo ARES 118
+    // U.O.C. ARES 118
+    '1494395589616468058' => 'coordinatore',     // U.O.C. Direzione Risorse Umane
+    '1565785287693566033' => 'coordinatore',     // U.O.C. Direzione Medica e Infermieristica
+    '1494395703563386989' => 'coordinatore',     // U.O.C. Direzione Grandi Eventi e Maxiemergenze
+    '1494382277118005249' => 'coordinatore',     // U.O.C. Direzione Formazione, Aggiornamento e Clinical Governance
+    '1494382276082143394' => 'coordinatore',     // U.O.C. Direzione Gestione Tecnico, Patrimoniale e Logistica
     // Gradi alti
     '1494382292750303343' => 'coordinatore',     // Ispettore Operativo
     '1494382295384195153' => 'coordinatore',     // Capo Turno
     // Sanitari
-    '1494382299452543176' => 'medico',           // Medico
-    '1494382301952344228' => 'infermiere',       // Infermiere
+    '1494382299452543176' => 'medico',           // Medico Emergenza Urgenza 118
+    '1494382301952344228' => 'infermiere',       // Infermiere Emergenza Urgenza 118
     // Operatori
-    '1494382304485703771' => 'soccorritore',     // Capo Equipaggio
+    '1494382304485703771' => 'soccorritore',     // Capo Equipaggio (se esiste ancora come ruolo)
     '1494382309733044386' => 'soccorritore',     // Soccorritore Avanzato
-    '1494382312924778516' => 'soccorritore',     // Soccorritore Esperto / Operatore DAE
+    '1494382312924778516' => 'soccorritore',     // Soccorritore Esperto
     '1494382314980118620' => 'soccorritore',     // Soccorritore 118
     // In formazione
-    '1494382317978914836' => 'recluta',          // Soccorritore in Prova
-    '1494382318935081182' => 'recluta',          // Allievo Soccorritore
-    // Ancora da indicare (reparto USAR e Centrale Operativa): togli il commento e metti l'ID quando lo hai
+    '1494382317978914836' => 'recluta',          // Soccorritore in Formazione
+    '1494382318935081182' => 'recluta',          // Aspirante Soccorritore
+    // Ancora da indicare (Centrale Operativa): togli il commento e metti l'ID quando lo hai
     // 'ID_CENTRALINISTA'  => 'co',              // ruolo Discord dei centralinisti
 ];
 

@@ -22,6 +22,7 @@ $users = col('users');
 
 // un lavoro "in corso" da oltre 10 minuti e' rimasto a meta': torna in attesa
 $jobs->updateMany(['tipo' => 'credenziali', 'stato' => 'in_corso', 'claimed_at' => ['$lt' => time() - 600]], ['$set' => ['stato' => 'in_attesa']]);
+$jobs->updateMany(['tipo' => 'messaggio', 'stato' => 'in_corso', 'claimed_at' => ['$lt' => time() - 600]], ['$set' => ['stato' => 'in_attesa']]);
 
 function next_job(): ?array
 {
@@ -29,9 +30,37 @@ function next_job(): ?array
     return $rows[0] ?? null;
 }
 
+function next_msg(): ?array
+{
+    $rows = find_all('jobs', ['tipo' => 'messaggio', 'stato' => 'in_attesa'], ['sort' => ['creato_at' => 1], 'limit' => 1]);
+    return $rows[0] ?? null;
+}
+
 try {
     if ($action === 'peek') {
-        bot_out(['ok' => true, 'pending' => next_job() !== null]);
+        bot_out(['ok' => true, 'pending' => next_job() !== null, 'pending_msg' => next_msg() !== null]);
+    }
+
+    // messaggi che il bot scrive in un canale (es. #gestioni)
+    if ($action === 'claim_msg') {
+        $m = next_msg();
+        if (!$m) {
+            bot_out(['ok' => true, 'job_id' => null]);
+        }
+        $jobs->updateOne(id_filter($m['id']), ['$set' => ['stato' => 'in_corso', 'claimed_at' => time()]]);
+        bot_out(['ok' => true, 'job_id' => $m['id'], 'canale' => (string)($m['canale'] ?? 'gestioni'), 'messaggi' => array_values((array)$m['messaggi'])]);
+    }
+
+    if ($action === 'report_msg') {
+        $m = find_one_by('jobs', id_filter((string)($body['job_id'] ?? '')));
+        if (!$m || ($m['tipo'] ?? '') !== 'messaggio') {
+            bot_out(['ok' => false, 'error' => 'Lavoro non trovato'], 404);
+        }
+        $okSend = !empty($body['sent']);
+        $jobs->updateOne(id_filter($m['id']), ['$set' => $okSend
+            ? ['stato' => 'completato', 'completato_at' => time()]
+            : ['stato' => 'errore', 'errore' => mb_substr((string)($body['error'] ?? 'errore'), 0, 120), 'completato_at' => time()]]);
+        bot_out(['ok' => true]);
     }
 
     if ($action === 'claim') {

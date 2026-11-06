@@ -363,3 +363,21 @@ html{background:#071a38;min-height:100%}
 body{min-height:100vh}
 body.dark a.btn,body.dark a.btn.blue,body.dark a.btn.teal,body.dark a.btn.red{color:#fff}
 body.dark a.btn.orange{color:#ffcf66}
+
+/* ===== avvisi a schermo (gestioni) e licenziamento ===== */
+.avviso-gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(4,12,30,.94);backdrop-filter:blur(6px);overflow:auto}
+.avviso-box{width:100%;max-width:520px;color:#e9f0fa;background:linear-gradient(155deg,rgba(20,64,124,.97),rgba(14,36,74,.97) 60%,rgba(110,12,30,.9));border:1px solid rgba(255,255,255,.28);border-radius:14px;padding:28px 28px 24px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.avviso-box h2{margin:0 0 14px;color:#fff;font-size:1.5rem}
+.av-riga{margin:0 0 8px;font-size:1.15rem;font-weight:500;color:#fff}
+.av-da{margin:14px 0 4px;color:#c5d6ee}
+.av-riep{margin:12px 0;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:8px 12px;font-size:.95rem}
+.av-riep summary{cursor:pointer;color:#cfe0f5}
+.av-riep ul{margin:8px 0 2px 18px;padding:0}.av-riep li{margin:3px 0}
+.avviso-box form{text-align:center;margin-top:16px}
+.avviso-box .btn{min-width:160px;padding:12px 28px;font-size:1.1rem}
+.fired-box{background:rgba(200,16,46,.22);border:1px solid #e0536a;border-left:5px solid #e0364b;border-radius:8px;padding:14px 16px;margin-bottom:14px;text-align:left;color:#ffe3e7}
+.fired-box p{margin:6px 0;font-size:1.1rem;color:#fff}
+.fired-box form{margin-top:10px}
+.gtbl input[type=text],.gtbl select{min-width:150px;font-size:.88rem;padding:6px 8px}
+.gtbl td{vertical-align:top}.gtbl .g-grado,.gtbl .g-motivo{display:none}
+.gtbl td:first-child{white-space:nowrap}

@@ -45,30 +45,15 @@ const GCS_E = [4 => 'E4 - SPONTANEA', 3 => 'E3 - ALLA VOCE', 2 => 'E2 - AL DOLOR
 const GCS_V = [5 => 'V5 - ORIENTATO', 4 => 'V4 - CONFUSO', 3 => 'V3 - PAROLE INAPPROPRIATE', 2 => 'V2 - SUONI INCOMPRENSIBILI', 1 => 'V1 - NESSUNA RISPOSTA'];
 const GCS_M = [6 => 'M6 - OBBEDISCE AI COMANDI', 5 => 'M5 - LOCALIZZA IL DOLORE', 4 => 'M4 - RITIRA ARTO AL DOLORE', 3 => 'M3 - FLESSORIA ANOMALA', 2 => 'M2 - ESTENSORIA ANOMALA', 1 => 'M1 - NESSUNA RISPOSTA'];
 
-const CODICI_RIENTRO = [
-    'bianco' => 'Bianco', 'verde' => 'Verde', 'giallo' => 'Giallo', 'rosso' => 'Rosso', 'nero' => 'Nero',
+// Codice di rientro (C1-C4) e codice patologia riscontrata (C1-C15, C19, C20: dal 16 al 18 non esistono)
+const CODICI_RIENTRO = ['C1' => 'C1', 'C2' => 'C2', 'C3' => 'C3', 'C4' => 'C4'];
+const CODICI_PATOLOGIA = [
+    'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14', 'C15', 'C19', 'C20',
 ];
 
-// Colori usati per i badge dei codici
+// Vecchi codici a colore: restano solo per leggere le schede salvate prima della modifica
 const CODICI_COLORI = [
     'bianco' => '#e5e7eb', 'verde' => '#16a34a', 'giallo' => '#eab308', 'rosso' => '#dc2626', 'nero' => '#111827',
-];
-
-// Elenchi con filtro "scrivi per filtrare" (si puo' comunque scrivere a mano).
-// Sono elenchi di partenza: mandami quelli completi e li sostituisco.
-const PATOLOGIE = [
-    'Cardiocircolatoria', 'Respiratoria', 'Neurologica', 'Traumatica', 'Metabolica',
-    'Intossicazione', 'Ustione', 'Ostetrico-ginecologica', 'Psichiatrica', 'Allergica',
-    'Ambientale (caldo/freddo)', 'Altra patologia', 'Non rilevata',
-];
-const DINAMICHE = [
-    'Incidente stradale', 'Incidente sul lavoro', 'Caduta', 'Aggressione', 'Ferita da arma',
-    'Incidente domestico', 'Incidente sportivo', 'Malore', 'Annegamento', 'Altra dinamica',
-];
-const CODICI_PATOLOGIA = [
-    'Dolore toracico', 'Arresto cardiaco', 'STEMI', 'Trauma maggiore', 'Trauma minore',
-    'Difficolta respiratoria', 'Alterazione stato di coscienza', 'Convulsioni', 'Ictus',
-    'Emorragia', 'Ipoglicemia', 'Intossicazione', 'Parto', 'Altro',
 ];
 
 // Trattamenti (codice + descrizione). Elenco ricostruito dagli screenshot: puo' essere incompleto.
@@ -132,14 +117,31 @@ const EQUIPAGGIO = [
 // ---------- Centrale Operativa ----------
 // Gradi (titolo mostrato nel profilo, assegnato dagli amministrativi). Elenco suggerito: si puo' scrivere anche altro.
 const GRADI = [
-    'Dirigente ARES 118', 'Vice Dirigente ARES 118',
+    'Direttore Generale ARES 118', 'Direttore Sanitario ARES 118', 'Direttore Amministrativo ARES 118',
+    'U.O.C. Direzione Risorse Umane', 'U.O.C. Direzione Medica e Infermieristica', 'U.O.C. Direzione Grandi Eventi e Maxiemergenze',
+    'U.O.C. Direzione Formazione, Aggiornamento e Clinical Governance', 'U.O.C. Direzione Gestione Tecnico, Patrimoniale e Logistica',
     'Ispettore Operativo', 'Capo Turno',
-    'Referente Medici', 'Referente Infermieri', 'Referente Operatori', 'Referente Emergenze', 'Referente Formazione', 'Referente Materiali',
-    'Direttore Generale USAR', 'Direttore Sanitario', 'Direttore U.O.C. Grandi eventi', 'Coordinatore Infermieristico',
     'Medico Emergenza Urgenza 118', 'Infermiere Emergenza Urgenza 118',
-    'Soccorritore Avanzato', 'Soccorritore Esperto / Operatore', 'Soccorritore 118', 'Soccorritore in Prova', 'Allievo Soccorritore',
+    'Soccorritore Avanzato', 'Soccorritore Esperto', 'Soccorritore 118', 'Soccorritore in Formazione', 'Aspirante Soccorritore',
+    // reparto USAR (non nell'ultimo elenco dei ruoli Discord: restano per chi ce l'ha ancora)
+    'Direttore Generale USAR', 'Direttore Sanitario', 'Direttore U.O.C. Grandi eventi', 'Coordinatore Infermieristico',
     'Operatore USAR Expert', 'Operatore USAR Effective', 'Operatore in Affiancamento', 'Discente', 'Candidato',
     'Operatore della Settimana',
+];
+
+// Vecchi nomi dei gradi -> nuovi (il sito li aggiorna da solo nelle persone gia' inserite)
+const GRADI_RINOMINATI = [
+    'Dirigente ARES 118' => 'Direttore Generale ARES 118',
+    'Vice Dirigente ARES 118' => 'Direttore Sanitario ARES 118',
+    'Referente Medici' => 'U.O.C. Direzione Medica e Infermieristica',
+    'Referente Infermieri' => 'U.O.C. Direzione Medica e Infermieristica',
+    'Referente Operatori' => 'U.O.C. Direzione Risorse Umane',
+    'Referente Emergenze' => 'U.O.C. Direzione Grandi Eventi e Maxiemergenze',
+    'Referente Formazione' => 'U.O.C. Direzione Formazione, Aggiornamento e Clinical Governance',
+    'Referente Materiali' => 'U.O.C. Direzione Gestione Tecnico, Patrimoniale e Logistica',
+    'Soccorritore Esperto / Operatore' => 'Soccorritore Esperto',
+    'Soccorritore in Prova' => 'Soccorritore in Formazione',
+    'Allievo Soccorritore' => 'Aspirante Soccorritore',
 ];
 
 const TIPI_MEZZO = ['MSB', 'MSA1', 'MSA2', 'AI', 'AM', 'USAR'];
